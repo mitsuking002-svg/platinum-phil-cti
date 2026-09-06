@@ -99,13 +99,28 @@ hr{border:0;border-top:1px solid #29313d;margin:13px 0}.footer{text-align:center
 
 .jsGuard{margin:0 2px 12px;padding:10px 12px;border-radius:12px;font-size:11px;font-weight:800;line-height:1.5;background:#351d24;color:#ffbec3;border:1px solid #6a3540}
 .jsGuard.ok{background:#10251d;color:#8ce4b8;border-color:#365e4e}
+
+.authGate{position:fixed;inset:0;z-index:1000;display:none;align-items:center;justify-content:center;padding:18px;background:radial-gradient(circle at 50% -20%,#2a2418 0,#10131a 38%,#090b10 78%)}
+.authCard{width:min(440px,100%);background:linear-gradient(180deg,#151923,#10141c);border:1px solid #343d4e;border-radius:22px;padding:22px;box-shadow:0 25px 80px rgba(0,0,0,.48)}
+.authLogo{font-size:22px;font-weight:950;letter-spacing:.03em;margin-bottom:5px}.authSub{color:#98a2b3;font-size:11px;margin-bottom:18px;line-height:1.6}.authError{min-height:20px;color:#ffadb3;font-size:11px;margin:8px 0}.cloudUser{font-size:10px;color:#9fc3ff;word-break:break-all}.cloudRow{display:flex;gap:8px;flex-wrap:wrap}.cloudRow .btn{flex:1}.cloudNote{font-size:10px;color:#8e98a9;line-height:1.6;margin-top:8px}
 </style>
 </head>
 <body>
-<div class="wrap">
+<div id="authGate" class="authGate">
+  <div class="authCard">
+    <div class="authLogo">PLATINUM PHIL CTI</div>
+    <div class="authSub">クラウド共有版 v1<br>スタッフアカウントでログインしてください。</div>
+    <div class="field"><label>メールアドレス</label><input id="loginEmail" type="email" autocomplete="username" placeholder="staff@example.com"></div>
+    <div class="field"><label>パスワード</label><input id="loginPassword" type="password" autocomplete="current-password" placeholder="パスワード"></div>
+    <div id="loginError" class="authError"></div>
+    <button id="loginBtn" class="btn" type="button" style="width:100%">ログイン</button>
+    <div class="cloudNote">顧客データはSupabaseのクラウドDBに保存されます。ログインしていない端末からは読み取れません。</div>
+  </div>
+</div>
+<div id="appRoot" class="wrap" style="display:none">
 <header>
- <div><div class="brand">PLATINUM PHIL CTI</div><div class="sub">03plus × Customer CRM / Production v1</div></div>
- <div class="liveBadge">● CTI READY</div>
+ <div><div class="brand">PLATINUM PHIL CTI</div><div class="sub">03plus × Cloud Customer CRM / Production v1</div></div>
+ <div id="cloudBadge" class="liveBadge">↻ CLOUD</div>
 </header>
 <div id="jsGuard" class="jsGuard">⚠ この表示が消えない場合、この画面ではJavaScriptが実行されていません。ChatGPT内プレビュー／iPhoneのファイルプレビューでは顧客登録・検索は動作しません。Safari・Chrome等の通常ブラウザでWeb URLとして開いてください。</div>
 
@@ -219,10 +234,10 @@ hr{border:0;border-top:1px solid #29313d;margin:13px 0}.footer{text-align:center
 <section id="settings">
  
  <div class="card">
-  <h2>本格運用に移すとき</h2>
-  <div class="notice">
-   今の版は試作なので、この端末のブラウザ内に保存します。本番では <b>ログイン / クラウドDB / 自動バックアップ / 操作履歴 / HTTPS</b> を付けて、複数PCでも同じ顧客カルテを使える構成にします。
-  </div>
+  <h2>クラウド接続</h2>
+  <div class="notice"><b>SupabaseクラウドDB接続済み</b><br>PC・タブレット・スマホから同じ顧客・利用履歴を共有します。データ操作にはスタッフログインが必要です。</div>
+  <div style="margin-top:10px" class="cloudUser">ログイン中：<span id="loginEmailLabel">—</span></div>
+  <div class="cloudRow" style="margin-top:10px"><button id="syncNow" class="btn secondary" type="button">今すぐ同期</button><button id="logoutBtn" class="btn red" type="button">ログアウト</button></div>
  </div>
 
  <div class="card">
@@ -239,10 +254,10 @@ hr{border:0;border-top:1px solid #29313d;margin:13px 0}.footer{text-align:center
   <h2>本番時の03plus設定</h2>
   <div class="notice">
    03plusの着信ポップアップで「自動実行 → URLを開く」を使い、公開したCTIのURLへ <b>%TEL</b> を渡します。
-   この試作版は <b>?tel=電話番号</b> を受け取るように作ってあります。
+   クラウド版も <b>?tel=電話番号</b> を受け取って、ログイン後にクラウドDBから自動照会します。
   </div>
-  <div class="code">https://あなたのCTIドメイン/?tel=%TEL</div>
-  <div class="hint">実際の自動連携には、このHTMLをHTTPSのWebサーバーへ置いてURLを固定する必要があります。</div>
+  <div class="code">https://mitsuking002-svg.github.io/platinum-phil-cti/?tel=%TEL</div>
+  <div class="hint">GitHub PagesのHTTPS公開URLを固定URLとして利用します。</div>
  </div>
 
  <div class="card">
@@ -261,18 +276,18 @@ hr{border:0;border-top:1px solid #29313d;margin:13px 0}.footer{text-align:center
  </div>
 
  <div class="card">
-  <h2>旧カルテデータ</h2>
-  <button id="importOld" class="btn secondary">旧・顧客カルテから取り込む</button>
-  <div id="oldHint" class="hint"></div>
+  <h2>旧ローカルデータ移行</h2>
+  <button id="importOld" class="btn secondary">この端末の旧データをクラウドへ移行</button>
+  <div id="oldHint" class="hint">以前このブラウザで登録したローカルデータがある場合、一度だけクラウドへ移行できます。</div>
  </div>
 
  <div class="card">
   <h2>データ削除</h2>
-  <button id="clearAll" class="btn red">このCTIの全データを削除</button>
+  <button id="clearAll" class="btn red">クラウドの全データを削除</button>
  </div>
 </section>
 
-<div class="footer">PLATINUM PHIL CTI CRM v1 — search fixed production</div>
+<div class="footer">PLATINUM PHIL CTI CRM v1 — CLOUD / MULTI DEVICE</div>
 </div>
 
 <div id="modal" class="modal">
@@ -312,511 +327,220 @@ hr{border:0;border-top:1px solid #29313d;margin:13px 0}.footer{text-align:center
  </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-window.addEventListener("error",e=>{const g=document.getElementById("jsGuard");if(g){g.classList.remove("ok");g.textContent="⚠ アプリ処理エラー: "+(e.message||"不明なエラー")}});
+window.addEventListener("error",e=>{
+  const g=document.getElementById("jsGuard");
+  if(g){g.classList.remove("ok");g.style.display="block";g.textContent="⚠ アプリ処理エラー: "+(e.message||"不明なエラー")}
+});
+
+const SUPABASE_URL="https://ontakcsvxzrglwtmefdn.supabase.co";
+const SUPABASE_KEY="sb_publishable_LkOEtdMwOawKNgEnIQwEFw_yEXJX7DV";
+const client=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{
+  auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}
+});
+
 const $=id=>document.getElementById(id);
-const KEY="pp_cti_crm_v2", OLD="pp_customer_crm_v1";
 const esc=s=>String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[m]));
 const digits=s=>String(s||"").replace(/\D/g,"");
-const normPhone=s=>{
- let d=digits(s);
- if(d.startsWith("81") && d.length>=11) d="0"+d.slice(2);
- return d;
-};
-const last4=s=>{
- const d=normPhone(s);
- return d.length>=4?d.slice(-4):d;
-};
-let flashMessage="";
-const prettyPhone=s=>{
- const d=normPhone(s);
- if(d.length===11) return d.slice(0,3)+"-"+d.slice(3,7)+"-"+d.slice(7);
- if(d.length===10) return d.slice(0,3)+"-"+d.slice(3,6)+"-"+d.slice(6);
- return s||"";
-};
+const normPhone=s=>{let d=digits(s);if(d.startsWith("81")&&d.length>=11)d="0"+d.slice(2);return d};
+const last4=s=>{const d=normPhone(s);return d.length>=4?d.slice(-4):d};
+const prettyPhone=s=>{const d=normPhone(s);if(d.length===11)return d.slice(0,3)+"-"+d.slice(3,7)+"-"+d.slice(7);if(d.length===10)return d.slice(0,3)+"-"+d.slice(3,6)+"-"+d.slice(6);return s||""};
 const yen=n=>"¥"+Number(n||0).toLocaleString("ja-JP");
 function today(){const d=new Date(),z=n=>String(n).padStart(2,"0");return `${d.getFullYear()}-${z(d.getMonth()+1)}-${z(d.getDate())}`}
 function nowTime(){const d=new Date(),z=n=>String(n).padStart(2,"0");return `${z(d.getHours())}:${z(d.getMinutes())}`}
-let memoryDb={visits:[],customers:{}};
-let storageAvailable=true;
-let dbInitialized=false;
-const cloneDb=db=>JSON.parse(JSON.stringify(db));
-function normalizeDb(db){
- if(!db || typeof db!=="object") db={};
- if(!Array.isArray(db.visits)) db.visits=[];
- if(!db.customers || typeof db.customers!=="object" || Array.isArray(db.customers)) db.customers={};
- return db;
+
+let db={visits:[],customers:{}};
+let flashMessage="";
+let currentCallPhone="",currentCustomerId="",currentModalId="";
+let refreshBusy=false, refreshQueued=false, pendingTel="";
+let currentUser=null;
+
+function setCloudBadge(text,mode="ok"){
+  const b=$("cloudBadge"); if(!b)return;
+  b.textContent=text;
+  if(mode==="err"){b.style.color="#ffadb3";b.style.borderColor="#62313b";b.style.background="#351d24"}
+  else if(mode==="sync"){b.style.color="#f0d27b";b.style.borderColor="#6b5830";b.style.background="#27271f"}
+  else{b.style.color="#79d9ad";b.style.borderColor="#365e4e";b.style.background="#10251d"}
 }
-// 保存データは起動時に1回だけ読み込む。
-// 以後の画面表示・検索は memoryDb を正本にすることで、
-// iPhone/HTMLプレビュー等で localStorage が読み取り専用・不安定でも
-// 「登録直後のデータが古い保存内容で消える」現象を防ぐ。
-function initDb(){
- if(dbInitialized)return;
- dbInitialized=true;
- try{
-   const raw=localStorage.getItem(KEY);
-   if(raw) memoryDb=normalizeDb(JSON.parse(raw));
- }catch(e){
-   storageAvailable=false;
-   console.warn("CTI storage init failed",e);
- }
- memoryDb=normalizeDb(memoryDb);
-}
-function load(){
- initDb();
- return cloneDb(memoryDb);
-}
-function save(db){
- initDb();
- db=normalizeDb(db);
- memoryDb=cloneDb(db); // まず画面内データを確実に更新
- try{
-   const payload=JSON.stringify(memoryDb);
-   localStorage.setItem(KEY,payload);
-   const verify=localStorage.getItem(KEY);
-   storageAvailable=(verify===payload);
-   if(!storageAvailable) console.warn("CTI storage verification mismatch");
-   return storageAvailable;
- }catch(e){
-   storageAvailable=false;
-   console.warn("CTI storage write failed",e);
-   // 永続保存に失敗しても、この画面を開いている間は memoryDb で登録・検索を継続
-   return false;
- }
-}
-function customerId(phone,name=""){return normPhone(phone)||("name:"+String(name).trim().toLowerCase())}
-function ensureCustomer(db,phone,name){
- const id=customerId(phone,name);
- if(!db.customers[id]) db.customers[id]={id,name:name||"",phone:phone||"",note:"",vip:false,ng:false,createdAt:new Date().toISOString()};
- if(name) db.customers[id].name=name;
- if(phone) db.customers[id].phone=phone;
- if(db.customers[id].note===undefined) db.customers[id].note="";
- return db.customers[id];
-}
-function customerVisits(db,id){return db.visits.filter(v=>v.customerId===id).sort((a,b)=>(b.date+b.time).localeCompare(a.date+a.time))}
+function cloneDb(){return JSON.parse(JSON.stringify(db))}
+function customerVisits(id){return db.visits.filter(v=>v.customerId===id).sort((a,b)=>((b.date||"")+(b.time||"")).localeCompare((a.date||"")+(a.time||"")))}
 function allCustomers(){
- const db=load();
- return Object.values(db.customers).map(c=>({c,visits:customerVisits(db,c.id)})).sort((a,b)=>{
-  const A=a.visits[0]?.date+a.visits[0]?.time||"",B=b.visits[0]?.date+b.visits[0]?.time||"";
-  return B.localeCompare(A);
- });
+  return Object.values(db.customers).map(c=>({c,visits:customerVisits(c.id)})).sort((a,b)=>{
+    const A=a.visits[0]?.date+a.visits[0]?.time||"",B=b.visits[0]?.date+b.visits[0]?.time||"";return B.localeCompare(A)
+  });
 }
 function stats(visits){
- const total=visits.reduce((a,v)=>a+Number(v.paid||0),0), girls={};
- visits.forEach(v=>{if(v.girl)girls[v.girl]=(girls[v.girl]||0)+1});
- const fav=Object.entries(girls).sort((a,b)=>b[1]-a[1])[0]?.[0]||"—";
- return {count:visits.length,total,last:visits[0]?.date||"—",fav};
+  const total=visits.reduce((a,v)=>a+Number(v.paid||0),0),girls={};
+  visits.forEach(v=>{if(v.girl)girls[v.girl]=(girls[v.girl]||0)+1});
+  const fav=Object.entries(girls).sort((a,b)=>b[1]-a[1])[0]?.[0]||"—";
+  return {count:visits.length,total,last:visits[0]?.date||"—",fav};
 }
 function paymentSummary(visits){
- const ordered=[...visits].sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time));
- if(!ordered.length) return "支払履歴なし";
- return ordered.map((v,i)=>`${i+1}回目 ${yen(v.paid)}`).join(" / ");
+  const ordered=[...visits].sort((a,b)=>((a.date||"")+(a.time||"")).localeCompare((b.date||"")+(b.time||"")));
+  return ordered.length?ordered.map((v,i)=>`${i+1}回目 ${yen(v.paid)}`).join(" / "):"支払履歴なし";
 }
-function flags(c){
- return `${c.vip?'<span class="flag vip">★ VIP</span>':""}${c.ng?'<span class="flag ng">! 注意</span>':""}`;
-}
-function customerCard(item){
- const {c,visits}=item,s=stats(visits);
- return `<div class="customer">
-  <div class="custTop">
-   <div><div class="custName">${esc(c.name||"未登録のお客様")}</div><div class="phone">${esc(prettyPhone(c.phone))}</div></div>
-   <div style="text-align:right">${flags(c)}<div class="meta">最終 ${esc(s.last)}</div></div>
-  </div>
-  <div class="pills">
-    <span class="pill">${s.count}回利用</span>
-    <span class="pill">累計支払 ${yen(s.total)}</span>
-    <span class="pill">よく利用 ${esc(s.fav)}</span>
-  </div>
-  <div class="meta" style="margin-top:8px;color:#d8dde7">
-    <b style="color:#f0d47c">各回支払：</b>${esc(paymentSummary(visits))}
-  </div>
-  <div class="rowActions">
-    ${c.phone?`<a class="telLink" href="tel:${normPhone(c.phone)}"><button class="btn small green">☎ 発信</button></a>`:""}
-    <button class="btn small secondary" onclick="openCustomer('${encodeURIComponent(c.id)}')">カルテ</button>
-    <button class="btn small blue" onclick="editCustomer('${encodeURIComponent(c.id)}')">編集</button>
-    <button class="btn small" onclick="useCustomer('${encodeURIComponent(c.id)}')">＋ 今回利用</button>
-  </div>
- </div>`;
-}
-function visitRow(v){
- return `<div class="visit">
-   <div class="visitTop"><div class="visitMain">${esc(v.date)} ${esc(v.time||"")}　${esc(v.girl||"女の子未入力")}</div><div class="money">${yen(v.paid)}</div></div>
-   <div class="meta">${esc(v.course||0)}分 ・ ${esc(v.place||"場所未入力")}<br>${v.memo?esc(v.memo):""}</div>
- </div>`;
-}
+function flags(c){return `${c.vip?'<span class="flag vip">★ VIP</span>':""}${c.ng?'<span class="flag ng">! 注意</span>':""}`}
+function visitRow(v){return `<div class="visit"><div class="visitTop"><div class="visitMain">${esc(v.date)} ${esc((v.time||"").slice(0,5))}　${esc(v.girl||"女の子未入力")}</div><div class="money">${yen(v.paid)}</div></div><div class="meta">${esc(v.course||0)}分 ・ ${esc(v.place||"場所未入力")}<br>${v.memo?esc(v.memo):""}</div></div>`}
 function matchItem(item,q){
- q=String(q||"").trim().toLowerCase();
- if(!q)return true;
- const customerPhone=normPhone(item.c.phone);
- const qDigits=digits(q);
- if(qDigits){
-   if(customerPhone.includes(qDigits)) return true;
-   if(qDigits.length<=4 && customerPhone.endsWith(qDigits)) return true;
- }
- const hay=[
-   item.c.name,item.c.phone,item.c.note,
-   ...item.visits.flatMap(v=>[v.place,v.girl,v.date,v.time,v.course,v.paid,v.memo])
- ].join(" ").toLowerCase();
- return hay.includes(q);
+  q=String(q||"").trim().toLowerCase(); if(!q)return true;
+  const customerPhone=normPhone(item.c.phone),qDigits=digits(q);
+  if(qDigits){if(customerPhone.includes(qDigits))return true;if(qDigits.length<=4&&customerPhone.endsWith(qDigits))return true}
+  const hay=[item.c.name,item.c.phone,item.c.note,...item.visits.flatMap(v=>[v.place,v.girl,v.date,v.time,v.course,v.paid,v.memo])].join(" ").toLowerCase();
+  return hay.includes(q);
 }
-function setTab(id){
- const radio=document.getElementById("tab-"+id);
- if(radio) radio.checked=true;
-  if(id==="dashboard")renderDashboard();
+function setTab(id){const r=$("tab-"+id);if(r)r.checked=true;if(id==="dashboard")renderDashboard()}
+function setGuardOk(){const g=$("jsGuard");if(g){g.classList.add("ok");g.textContent="✓ クラウド接続：顧客データは全端末で共有されます。";setTimeout(()=>{g.style.display="none"},2200)}}
+function friendlyError(e){
+  const m=String(e?.message||e||"不明なエラー");
+  if(m.includes("Invalid login credentials"))return "メールアドレスまたはパスワードが違います。";
+  if(m.includes("duplicate key"))return "その電話番号はすでに登録されています。";
+  if(m.includes("Failed to fetch"))return "通信できません。インターネット接続を確認してください。";
+  return m;
 }
 
+async function refreshCloud({quiet=false}={}){
+  if(!currentUser)return;
+  if(refreshBusy){refreshQueued=true;return}
+  refreshBusy=true;if(!quiet)setCloudBadge("↻ 同期中","sync");
+  try{
+    const [cr,vr]=await Promise.all([
+      client.from("customers").select("id,name,phone,note,vip,ng,created_at,updated_at").order("created_at",{ascending:false}),
+      client.from("visits").select("id,customer_id,place,visit_date,visit_time,girl,course,paid,memo,created_at").order("visit_date",{ascending:false}).order("visit_time",{ascending:false})
+    ]);
+    if(cr.error)throw cr.error;if(vr.error)throw vr.error;
+    db.customers={};(cr.data||[]).forEach(c=>{db.customers[c.id]={...c}});
+    db.visits=(vr.data||[]).map(v=>({id:v.id,customerId:v.customer_id,place:v.place||"",date:v.visit_date,time:v.visit_time||"",girl:v.girl||"",course:v.course||0,paid:v.paid||0,memo:v.memo||"",createdAt:v.created_at}));
+    setCloudBadge("● CLOUD READY");
+    renderQuick();
+    if($("tab-dashboard")?.checked)renderDashboard();
+    if(currentModalId&&$("modal")?.classList.contains("show")&&db.customers[currentModalId])openCustomer(encodeURIComponent(currentModalId));
+  }catch(e){console.error(e);setCloudBadge("⚠ CLOUD ERROR","err");if(!quiet)alert("クラウド同期エラー："+friendlyError(e))}
+  finally{refreshBusy=false;if(refreshQueued){refreshQueued=false;setTimeout(()=>refreshCloud({quiet:true}),250)}}
+}
 
 function renderQuick(){
- const q=$("quickSearch").value.trim();
-
- if(flashMessage){
-   $("searchFlash").style.display="block";
-   $("searchFlash").innerHTML=flashMessage;
- }else{
-   $("searchFlash").style.display="none";
-   $("searchFlash").innerHTML="";
- }
-
- if(!q){
-   $("quickResults").innerHTML='<div class="empty">下4桁・名前・電話番号を入力すると、ここに顧客情報と利用履歴が表示されます。</div>';
-   return;
- }
-
- const arr=allCustomers().filter(x=>matchItem(x,q)).slice(0,20);
- if(!arr.length){
-   $("quickResults").innerHTML='<div class="empty">該当するお客様はいません。未登録の場合は「顧客登録」タブから登録できます。</div>';
-   return;
- }
-
- $("quickResults").innerHTML=arr.map(item=>{
-   const {c,visits}=item,s=stats(visits);
-   const recent=visits.slice(0,5).map(v=>`
-     <div class="visit">
-       <div class="visitTop">
-         <div class="visitMain">${esc(v.date)} ${esc(v.time||"")}　${esc(v.girl||"女の子未入力")}</div>
-         <div class="money">${yen(v.paid)}</div>
-       </div>
-       <div class="meta">${esc(v.course||0)}分 ・ ${esc(v.place||"場所未入力")}</div>
-     </div>`).join("");
-
-   return `<div class="masterBox">
-     <div class="custTop">
-       <div>
-         <div class="custName">${esc(c.name||"未登録のお客様")}</div>
-         <div class="phone">${esc(prettyPhone(c.phone))}</div>
-       </div>
-       <div style="text-align:right">${flags(c)}<div class="meta">最終 ${esc(s.last)}</div></div>
-     </div>
-
-     <div class="infoStrip">
-       <div class="infoItem"><small>利用回数</small><strong>${s.count}回</strong></div>
-       <div class="infoItem"><small>累計支払</small><strong>${yen(s.total)}</strong></div>
-       <div class="infoItem"><small>よく利用</small><strong>${esc(s.fav)}</strong></div>
-       <div class="infoItem"><small>直近支払</small><strong>${visits[0]?yen(visits[0].paid):"—"}</strong></div>
-     </div>
-
-     ${visits.length ? `
-       <div class="notice" style="margin:10px 0">
-         <b>各回支払</b><br>${esc(paymentSummary(visits))}
-       </div>
-       <div class="meta" style="margin-bottom:6px"><b style="color:#f0d47c">過去利用</b></div>
-       ${recent}
-     ` : `
-       <div class="notice" style="margin:10px 0">
-         <b>顧客登録済み</b><br>まだ利用履歴はありません。「＋ 今回利用」から最初の利用内容を追加できます。
-       </div>
-     `}
-
-     ${c.note ? `<div class="meta" style="margin-top:8px"><b>顧客メモ：</b>${esc(c.note)}</div>` : ""}
-
-     <div class="rowActions">
-       ${c.phone?`<a class="telLink" href="tel:${normPhone(c.phone)}"><button class="btn small green">☎ 発信</button></a>`:""}
-       <button class="btn small secondary" onclick="openCustomer('${encodeURIComponent(c.id)}')">全履歴を見る</button>
-       <button class="btn small blue" onclick="editCustomer('${encodeURIComponent(c.id)}')">顧客編集</button>
-       <button class="btn small" onclick="useCustomer('${encodeURIComponent(c.id)}')">＋ 今回利用</button>
-     </div>
-   </div>`;
- }).join("");
+  const el=$("quickSearch");if(!el)return;const q=el.value.trim();
+  if(flashMessage){$("searchFlash").style.display="block";$("searchFlash").innerHTML=flashMessage}else{$("searchFlash").style.display="none";$("searchFlash").innerHTML=""}
+  if(!q){$("quickResults").innerHTML='<div class="empty">下4桁・名前・電話番号を入力すると、ここに顧客情報と利用履歴が表示されます。</div>';return}
+  const arr=allCustomers().filter(x=>matchItem(x,q)).slice(0,30);
+  if(!arr.length){$("quickResults").innerHTML='<div class="empty">該当するお客様はいません。未登録の場合は「顧客登録」タブから登録できます。</div>';return}
+  $("quickResults").innerHTML=arr.map(item=>{
+    const {c,visits}=item,s=stats(visits),recent=visits.slice(0,5).map(v=>`<div class="visit"><div class="visitTop"><div class="visitMain">${esc(v.date)} ${esc((v.time||"").slice(0,5))}　${esc(v.girl||"女の子未入力")}</div><div class="money">${yen(v.paid)}</div></div><div class="meta">${esc(v.course||0)}分 ・ ${esc(v.place||"場所未入力")}</div></div>`).join("");
+    return `<div class="masterBox"><div class="custTop"><div><div class="custName">${esc(c.name||"未登録のお客様")}</div><div class="phone">${esc(prettyPhone(c.phone))}</div></div><div style="text-align:right">${flags(c)}<div class="meta">最終 ${esc(s.last)}</div></div></div><div class="infoStrip"><div class="infoItem"><small>利用回数</small><strong>${s.count}回</strong></div><div class="infoItem"><small>累計支払</small><strong>${yen(s.total)}</strong></div><div class="infoItem"><small>よく利用</small><strong>${esc(s.fav)}</strong></div><div class="infoItem"><small>直近支払</small><strong>${visits[0]?yen(visits[0].paid):"—"}</strong></div></div>${visits.length?`<div class="notice" style="margin:10px 0"><b>各回支払</b><br>${esc(paymentSummary(visits))}</div><div class="meta" style="margin-bottom:6px"><b style="color:#f0d47c">過去利用</b></div>${recent}`:`<div class="notice" style="margin:10px 0"><b>顧客登録済み</b><br>まだ利用履歴はありません。「＋ 今回利用」から最初の利用内容を追加できます。</div>`}${c.note?`<div class="meta" style="margin-top:8px"><b>顧客メモ：</b>${esc(c.note)}</div>`:""}<div class="rowActions">${c.phone?`<a class="telLink" href="tel:${normPhone(c.phone)}"><button class="btn small green">☎ 発信</button></a>`:""}<button class="btn small secondary" onclick="openCustomer('${encodeURIComponent(c.id)}')">全履歴を見る</button><button class="btn small blue" onclick="editCustomer('${encodeURIComponent(c.id)}')">顧客編集</button><button class="btn small" onclick="useCustomer('${encodeURIComponent(c.id)}')">＋ 今回利用</button></div></div>`
+  }).join("");
 }
-$("quickSearch").addEventListener("input",()=>{flashMessage="";renderQuick();});
-$("quickSearch").addEventListener("keyup",renderQuick);
-$("quickSearch").addEventListener("change",renderQuick);
-
-
-let currentCallPhone="", currentCustomerId="";
-function showIncoming(phone){
- currentCallPhone=phone||"";
- const db=load(), p=normPhone(phone);
- const found=Object.values(db.customers).find(c=>normPhone(c.phone)===p);
- currentCustomerId=found?.id||"";
- $("noCall").style.display="none";$("callHero").style.display="block";
- $("callerPhone").textContent=prettyPhone(phone);
- if(found){
-   const vs=customerVisits(db,found.id),s=stats(vs);
-   $("callerName").textContent=found.name||"名称未登録";
-   $("callerFlags").innerHTML=flags(found);
-   $("callerSub").textContent=`登録済みのお客様 / 最終利用 ${s.last}`;
-   $("callerSummary").innerHTML=`<div class="sum"><small>利用回数</small><b>${s.count}回</b></div><div class="sum"><small>累計支払</small><b>${yen(s.total)}</b></div><div class="sum"><small>よく利用</small><b>${esc(s.fav)}</b></div>`;
-   $("pastPanel").style.display="block";
-   $("pastVisits").innerHTML=`<div class="notice" style="margin-bottom:10px"><b>累計支払：${yen(s.total)}</b><br>各回支払：${esc(paymentSummary(vs))}</div>`+(vs.length?vs.slice(0,10).map(visitRow).join(""):'<div class="empty">履歴なし</div>');
-   $("openCard").disabled=false;
- }else{
-   $("callerName").textContent="未登録のお客様";
-   $("callerFlags").innerHTML="";
-   $("callerSub").textContent="新規番号です。予約が決まったら名前と利用内容を登録してください。";
-   $("callerSummary").innerHTML=`<div class="sum"><small>利用回数</small><b>0回</b></div><div class="sum"><small>累計支払</small><b>¥0</b></div><div class="sum"><small>最終利用</small><b>—</b></div>`;
-   $("pastPanel").style.display="none";$("openCard").disabled=true;
- }
- $("callVisitForm").style.display="none";
- document.querySelectorAll(".statusbtn").forEach(b=>b.classList.toggle("active",b.dataset.status==="着信"));
- $("callStateLabel").textContent="着信中 / 顧客照会";
- setTab("cti");
-}
-$("hideCall").onclick=()=>{
- $("callHero").style.display="none";$("callVisitForm").style.display="none";$("pastPanel").style.display="none";$("noCall").style.display="block";
- currentCallPhone="";currentCustomerId="";
-};
-
-document.querySelectorAll(".tabRadio").forEach(r=>r.addEventListener("change",()=>{
- if(!r.checked)return;
- const id=r.id.replace("tab-","");
-  if(id==="dashboard") renderDashboard();
- if(id==="cti") renderQuick();
-}));
-
-document.querySelectorAll(".statusbtn").forEach(b=>b.onclick=()=>{
- document.querySelectorAll(".statusbtn").forEach(x=>x.classList.remove("active"));b.classList.add("active");
- $("callStateLabel").textContent=b.dataset.status;
-});
-function fillFormFor(id,phone){
- const db=load(),c=db.customers[id];
- $("fName").value=c?.name||"";$("fPhone").value=c?.phone||phone||"";
- $("fDate").value=today();$("fTime").value=nowTime();$("fPlace").value="";$("fGirl").value="";$("fCourse").value="";$("fPaid").value="";$("fMemo").value="";
- $("callVisitForm").style.display="block";
- setTimeout(()=>$("fPlace").focus(),100);
-}
-$("addFromCall").onclick=()=>fillFormFor(currentCustomerId,currentCallPhone);
-$("openCard").onclick=()=>{if(currentCustomerId)openCustomer(encodeURIComponent(currentCustomerId))};
-
-$("saveCallVisit").onclick=()=>{
- const name=$("fName").value.trim(), phone=$("fPhone").value.trim(), date=$("fDate").value;
- if(!name){alert("お客様名を入力してください");return}
- if(!phone){alert("電話番号を入力してください");return}
- if(!date){alert("日付を入力してください");return}
- const db=load(), c=ensureCustomer(db,phone,name);
- const v={
-  id:Date.now()+"_"+Math.random().toString(36).slice(2,7),customerId:c.id,name,phone,
-  place:$("fPlace").value.trim(),date,time:$("fTime").value,girl:$("fGirl").value.trim(),
-  course:Number($("fCourse").value||0),paid:Number($("fPaid").value||0),memo:$("fMemo").value.trim(),
-  createdAt:new Date().toISOString()
- };
- db.visits.push(v);save(db);currentCustomerId=c.id;currentCallPhone=phone;
- $("saveCallVisit").textContent="保存しました ✓";
- showIncoming(phone);
- document.querySelectorAll(".statusbtn").forEach(x=>x.classList.toggle("active",x.dataset.status==="予約確定"));
- $("callStateLabel").textContent="予約確定";
- setTimeout(()=>$("saveCallVisit").textContent="保存して受付完了",900);
-};
-
-
-$("masterPhone").addEventListener("input",()=>{
- const p=normPhone($("masterPhone").value);
- if(!p){$("masterHint").textContent="";return}
- const hit=Object.values(load().customers).find(c=>normPhone(c.phone)===p);
- $("masterHint").innerHTML=hit?`この番号は登録済みです：<b>${esc(hit.name||"名称未登録")}</b>`:"未登録の電話番号です。";
-});
-$("saveMaster").onclick=()=>{
- const name=$("masterName").value.trim();
- const phone=$("masterPhone").value.trim();
- const note=$("masterNote").value.trim();
-
- if(!name){alert("お客様名を入力してください");return}
- if(!phone){alert("電話番号を入力してください");return}
- if(normPhone(phone).length<10){alert("電話番号を確認してください");return}
-
- const db=load();
- const p=normPhone(phone);
- const existing=Object.values(db.customers).find(c=>normPhone(c.phone)===p);
- let c;
-
- if(existing){
-   if(!confirm(`この電話番号は「${existing.name||"名称未登録"}」で登録済みです。登録内容を更新しますか？`))return;
-   existing.name=name;
-   existing.phone=phone;
-   existing.note=note||existing.note||"";
-   c=existing;
-
-   db.visits.forEach(v=>{
-     if(v.customerId===c.id){
-       v.name=name;
-       v.phone=phone;
-     }
-   });
- }else{
-   c=ensureCustomer(db,phone,name);
-   c.note=note;
- }
-
- const persisted=save(db);
-
- // memoryDb を正本として登録確認。localStorageが不安定でも検索は即反映する。
- const verifyDb=load();
- const savedCustomer=Object.values(verifyDb.customers).find(x=>normPhone(x.phone)===p);
- if(!savedCustomer){
-   alert("顧客登録処理に失敗しました。入力内容を確認してください。");
-   return;
- }
-
- // 登録直後に検索一覧も必ず更新する
- renderCustomers();
-
- // Registration -> merged CTI/search -> automatic lookup by last 4 digits
- const key=last4(phone);
- $("masterName").value="";
- $("masterPhone").value="";
- $("masterNote").value="";
- $("masterHint").textContent="";
-
- flashMessage=`<b>✓ 顧客登録完了</b><br>${esc(name)} / ${esc(prettyPhone(phone))} を登録しました。下4桁「${esc(key)}」で表示しています。${persisted?"":"<br><b>※このブラウザでは永続保存が使えないため、画面を閉じる前にJSONバックアップしてください。</b>"}`;
-
- $("quickSearch").value=key;
- $("callHero").style.display="none";
- $("callVisitForm").style.display="none";
- $("pastPanel").style.display="none";
- $("noCall").style.display="block";
-
- setTab("cti");
- renderQuick();
- window.scrollTo({top:0,behavior:"smooth"});
-
- setTimeout(()=>{
-   flashMessage="";
-   if($("searchFlash")) $("searchFlash").style.display="none";
- },6000);
-};
-
-function renderCustomers(){
- // v1 merged search: 顧客検索は「着信・履歴・顧客検索」に統合済み
- renderQuick();
-}
-
-
 
 function renderDashboard(){
- const db=load(),cs=Object.values(db.customers),vs=db.visits,total=vs.reduce((a,v)=>a+Number(v.paid||0),0);
- const rep=cs.filter(c=>customerVisits(db,c.id).length>=2).length;
- $("kpis").innerHTML=[
-  ["顧客数",cs.length+"人","登録済み"],
-  ["総利用",vs.length+"件","全履歴"],
-  ["累計支払",yen(total),"全履歴合計"],
-  ["リピーター",rep+"人",cs.length?Math.round(rep/cs.length*100)+"%":"0%"]
- ].map(x=>`<div class="kpi"><div class="n">${x[0]}</div><div class="v">${x[1]}</div><div class="s">${x[2]}</div></div>`).join("");
- const gr={};vs.forEach(v=>{if(v.girl)gr[v.girl]=(gr[v.girl]||0)+1});
- const rank=Object.entries(gr).sort((a,b)=>b[1]-a[1]).slice(0,10);
- $("girlRank").innerHTML=rank.length?rank.map(([g,n],i)=>`<div class="customer"><div class="custTop"><div class="custName">${i+1}. ${esc(g)}</div><div><b>${n}本</b></div></div></div>`).join(""):'<div class="empty">データなし</div>';
- const cutoff=new Date();cutoff.setDate(cutoff.getDate()-29);const csdate=cutoff.toISOString().slice(0,10),v30=vs.filter(v=>v.date>=csdate);
- const t30=v30.reduce((a,v)=>a+Number(v.paid||0),0);
- $("recent30").innerHTML=`<div class="kpis"><div class="kpi"><div class="n">利用件数</div><div class="v">${v30.length}</div><div class="s">直近30日</div></div><div class="kpi"><div class="n">支払合計</div><div class="v">${yen(t30)}</div><div class="s">直近30日</div></div><div class="kpi"><div class="n">平均支払</div><div class="v">${yen(v30.length?Math.round(t30/v30.length):0)}</div><div class="s">1利用あたり</div></div><div class="kpi"><div class="n">女の子数</div><div class="v">${new Set(v30.map(v=>v.girl).filter(Boolean)).size}人</div><div class="s">直近30日</div></div></div>`;
+  const cs=Object.values(db.customers),vs=db.visits,total=vs.reduce((a,v)=>a+Number(v.paid||0),0),rep=cs.filter(c=>customerVisits(c.id).length>=2).length;
+  $("kpis").innerHTML=[["顧客数",cs.length+"人","クラウド登録済み"],["総利用",vs.length+"件","全履歴"],["累計支払",yen(total),"全履歴合計"],["リピーター",rep+"人",cs.length?Math.round(rep/cs.length*100)+"%":"0%"]].map(x=>`<div class="kpi"><div class="n">${x[0]}</div><div class="v">${x[1]}</div><div class="s">${x[2]}</div></div>`).join("");
+  const gr={};vs.forEach(v=>{if(v.girl)gr[v.girl]=(gr[v.girl]||0)+1});const rank=Object.entries(gr).sort((a,b)=>b[1]-a[1]).slice(0,10);
+  $("girlRank").innerHTML=rank.length?rank.map(([g,n],i)=>`<div class="customer"><div class="custTop"><div class="custName">${i+1}. ${esc(g)}</div><div><b>${n}本</b></div></div></div>`).join(""):'<div class="empty">データなし</div>';
+  const cutoff=new Date();cutoff.setDate(cutoff.getDate()-29);const csdate=cutoff.toISOString().slice(0,10),v30=vs.filter(v=>v.date>=csdate),t30=v30.reduce((a,v)=>a+Number(v.paid||0),0);
+  $("recent30").innerHTML=`<div class="kpis"><div class="kpi"><div class="n">利用件数</div><div class="v">${v30.length}</div><div class="s">直近30日</div></div><div class="kpi"><div class="n">支払合計</div><div class="v">${yen(t30)}</div><div class="s">直近30日</div></div><div class="kpi"><div class="n">平均支払</div><div class="v">${yen(v30.length?Math.round(t30/v30.length):0)}</div><div class="s">1利用あたり</div></div><div class="kpi"><div class="n">女の子数</div><div class="v">${new Set(v30.map(v=>v.girl).filter(Boolean)).size}人</div><div class="s">直近30日</div></div></div>`;
 }
 
-window.openCustomer=function(enc){
- const id=decodeURIComponent(enc),db=load(),c=db.customers[id];if(!c)return;
- const vs=customerVisits(db,id),s=stats(vs);
- $("mName").textContent=c.name||"名称未登録";$("mPhone").textContent=prettyPhone(c.phone);$("mFlags").innerHTML=flags(c);
- $("mSummary").innerHTML=`<div class="sum"><small>利用回数</small><b>${s.count}回</b></div><div class="sum"><small>累計支払</small><b>${yen(s.total)}</b></div><div class="sum"><small>よく利用</small><b>${esc(s.fav)}</b></div>`;
- $("mCustomerNote").style.display=c.note?"block":"none";$("mCustomerNote").innerHTML=c.note?`<b>顧客メモ</b><br>${esc(c.note)}`:"";
- $("mHistory").innerHTML=`<div class="notice" style="margin-bottom:10px"><b>累計支払：${yen(s.total)}</b><br>各回支払：${esc(paymentSummary(vs))}</div>`+(vs.length?vs.map(visitRow).join(""):'<div class="empty">利用履歴なし</div>');
- $("mCall").href="tel:"+normPhone(c.phone);
- $("mUse").onclick=()=>{closeModal();showIncoming(c.phone);fillFormFor(c.id,c.phone)};
- $("vipBtn").onclick=()=>{const d=load();d.customers[id].vip=!d.customers[id].vip;save(d);openCustomer(encodeURIComponent(id));renderCustomers()};
- $("ngBtn").onclick=()=>{const d=load();d.customers[id].ng=!d.customers[id].ng;save(d);openCustomer(encodeURIComponent(id));renderCustomers()};
- $("modal").classList.add("show");
+function showIncoming(phone){
+  currentCallPhone=normPhone(phone||"");const found=Object.values(db.customers).find(c=>normPhone(c.phone)===currentCallPhone);currentCustomerId=found?.id||"";
+  $("noCall").style.display="none";$("callHero").style.display="block";$("callerPhone").textContent=prettyPhone(phone);
+  if(found){const vs=customerVisits(found.id),s=stats(vs);$("callerName").textContent=found.name||"名称未登録";$("callerFlags").innerHTML=flags(found);$("callerSub").textContent=`クラウド登録済み / 最終利用 ${s.last}`;$("callerSummary").innerHTML=`<div class="sum"><small>利用回数</small><b>${s.count}回</b></div><div class="sum"><small>累計支払</small><b>${yen(s.total)}</b></div><div class="sum"><small>よく利用</small><b>${esc(s.fav)}</b></div>`;$("pastPanel").style.display="block";$("pastVisits").innerHTML=`<div class="notice" style="margin-bottom:10px"><b>累計支払：${yen(s.total)}</b><br>各回支払：${esc(paymentSummary(vs))}</div>`+(vs.length?vs.slice(0,10).map(visitRow).join(""):'<div class="empty">履歴なし</div>');$("openCard").disabled=false}
+  else{$("callerName").textContent="未登録のお客様";$("callerFlags").innerHTML="";$("callerSub").textContent="新規番号です。予約が決まったら名前と利用内容を登録してください。";$("callerSummary").innerHTML='<div class="sum"><small>利用回数</small><b>0回</b></div><div class="sum"><small>累計支払</small><b>¥0</b></div><div class="sum"><small>最終利用</small><b>—</b></div>';$("pastPanel").style.display="none";$("openCard").disabled=true}
+  $("callVisitForm").style.display="none";document.querySelectorAll(".statusbtn").forEach(b=>b.classList.toggle("active",b.dataset.status==="着信"));$("callStateLabel").textContent="着信中 / 顧客照会";setTab("cti")
 }
-window.useCustomer=function(enc){
- const id=decodeURIComponent(enc),db=load(),c=db.customers[id];if(!c)return;
- showIncoming(c.phone);fillFormFor(id,c.phone);
-}
-function closeModal(){$("modal").classList.remove("show")}
-$("closeModal").onclick=closeModal;
-$("modal").onclick=e=>{if(e.target===$("modal"))closeModal()};
+function fillFormFor(id,phone){const c=db.customers[id];$("fName").value=c?.name||"";$("fPhone").value=c?.phone||phone||"";$("fDate").value=today();$("fTime").value=nowTime();$("fPlace").value="";$("fGirl").value="";$("fCourse").value="";$("fPaid").value="";$("fMemo").value="";$("callVisitForm").style.display="block";setTimeout(()=>$("fPlace").focus(),100)}
 
-$("testCall").onclick=()=>{const p=$("testTel").value.trim();if(!p){alert("テストする電話番号を入力してください");return}showIncoming(p)};
+async function ensureCloudCustomer(name,phone){
+  const p=normPhone(phone);let c=Object.values(db.customers).find(x=>normPhone(x.phone)===p);
+  if(c){if(c.name!==name||c.phone!==p){const r=await client.from("customers").update({name,phone:p,updated_at:new Date().toISOString()}).eq("id",c.id).select().single();if(r.error)throw r.error;c=r.data}return c}
+  const r=await client.from("customers").insert({name,phone:p}).select().single();if(r.error)throw r.error;return r.data;
+}
+
+window.openCustomer=function(enc){const id=decodeURIComponent(enc),c=db.customers[id];if(!c)return;currentModalId=id;const vs=customerVisits(id),s=stats(vs);$("mName").textContent=c.name||"名称未登録";$("mPhone").textContent=prettyPhone(c.phone);$("mFlags").innerHTML=flags(c);$("mSummary").innerHTML=`<div class="sum"><small>利用回数</small><b>${s.count}回</b></div><div class="sum"><small>累計支払</small><b>${yen(s.total)}</b></div><div class="sum"><small>よく利用</small><b>${esc(s.fav)}</b></div>`;$("mCustomerNote").style.display=c.note?"block":"none";$("mCustomerNote").innerHTML=c.note?`<b>顧客メモ</b><br>${esc(c.note)}`:"";$("mHistory").innerHTML=`<div class="notice" style="margin-bottom:10px"><b>累計支払：${yen(s.total)}</b><br>各回支払：${esc(paymentSummary(vs))}</div>`+(vs.length?vs.map(visitRow).join(""):'<div class="empty">利用履歴なし</div>');$("mCall").href="tel:"+normPhone(c.phone);$("mUse").onclick=()=>{closeModal();showIncoming(c.phone);fillFormFor(c.id,c.phone)};$("vipBtn").onclick=async()=>{const r=await client.from("customers").update({vip:!c.vip,updated_at:new Date().toISOString()}).eq("id",id);if(r.error)return alert(friendlyError(r.error));await refreshCloud({quiet:true});openCustomer(encodeURIComponent(id))};$("ngBtn").onclick=async()=>{const r=await client.from("customers").update({ng:!c.ng,updated_at:new Date().toISOString()}).eq("id",id);if(r.error)return alert(friendlyError(r.error));await refreshCloud({quiet:true});openCustomer(encodeURIComponent(id))};$("modal").classList.add("show")}
+window.useCustomer=function(enc){const id=decodeURIComponent(enc),c=db.customers[id];if(!c)return;showIncoming(c.phone);fillFormFor(id,c.phone)}
+window.editCustomer=function(enc){const id=decodeURIComponent(enc),c=db.customers[id];if(!c)return;$("eId").value=id;$("eName").value=c.name||"";$("ePhone").value=c.phone||"";$("eNote").value=c.note||"";$("editModal").classList.add("show")}
+function closeModal(){$("modal").classList.remove("show");currentModalId=""}
+function closeEdit(){$("editModal").classList.remove("show")}
+
+async function migrateLocal(){
+  let local;try{local=JSON.parse(localStorage.getItem("pp_cti_crm_v2")||"null")}catch{}
+  if(!local||!local.customers){alert("この端末には移行できる旧ローカルデータがありません。");return}
+  if(!confirm("この端末の旧ローカル顧客・履歴をクラウドへ取り込みますか？\n※同じ電話番号の顧客は更新します。"))return;
+  setCloudBadge("↻ 移行中","sync");
+  try{
+    const idMap={},customers=Object.values(local.customers||{});
+    for(const c of customers){const p=normPhone(c.phone);if(!p)continue;const r=await client.from("customers").upsert({name:c.name||"名称未登録",phone:p,note:c.note||"",vip:!!c.vip,ng:!!c.ng,updated_at:new Date().toISOString()},{onConflict:"phone"}).select().single();if(r.error)throw r.error;idMap[c.id]=r.data.id}
+    await refreshCloud({quiet:true});
+    const sig=new Set(db.visits.map(v=>[v.customerId,v.date,(v.time||"").slice(0,5),v.girl,v.paid,v.course,v.place].join("|")));let added=0;
+    for(const v of (local.visits||[])){
+      let cid=idMap[v.customerId];if(!cid&&v.phone){const c=await ensureCloudCustomer(v.name||"名称未登録",v.phone);cid=c.id}if(!cid)continue;
+      const s=[cid,v.date,(v.time||"").slice(0,5),v.girl||"",Number(v.paid||0),Number(v.course||0),v.place||""].join("|");if(sig.has(s))continue;
+      const r=await client.from("visits").insert({customer_id:cid,place:v.place||"",visit_date:v.date||today(),visit_time:v.time||null,girl:v.girl||"",course:Number(v.course||0)||null,paid:Number(v.paid||0),memo:v.memo||""});if(r.error)throw r.error;sig.add(s);added++
+    }
+    await refreshCloud({quiet:true});$("oldHint").textContent=`クラウドへ取り込み完了：顧客 ${customers.length}件 / 新規履歴 ${added}件`;alert("旧ローカルデータをクラウドへ移行しました。")
+  }catch(e){console.error(e);alert("移行エラー："+friendlyError(e));setCloudBadge("⚠ CLOUD ERROR","err")}
+}
 
 function dl(blob,name){const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
-$("csvBtn").onclick=()=>{
- const db=load();if(!db.visits.length){alert("利用履歴がありません");return}
- const h=["お客様名","電話番号","利用場所","日付","時間","女の子名","コース分","支払額","受付メモ"];
- const rows=db.visits.map(v=>[v.name,v.phone,v.place,v.date,v.time,v.girl,v.course,v.paid,v.memo]);
- const csv="\uFEFF"+[h,...rows].map(r=>r.map(x=>`"${String(x??"").replaceAll('"','""')}"`).join(",")).join("\n");
- dl(new Blob([csv],{type:"text/csv;charset=utf-8"}),"platinum_phil_cti_history.csv");
-};
-$("jsonBtn").onclick=()=>dl(new Blob([JSON.stringify(load(),null,2)],{type:"application/json"}),"platinum_phil_cti_backup.json");
-$("jsonImport").onchange=async e=>{
- const f=e.target.files[0];if(!f)return;
- try{
-  const data=JSON.parse(await f.text());
-  if(!data.visits||!data.customers)throw 0;
-  if(confirm("現在のCTIデータを、このバックアップ内容で置き換えますか？")){save(data);alert("復元しました");renderDashboard()}
- }catch{alert("このCTI用のJSONバックアップではありません")}
- e.target.value="";
-};
-$("clearAll").onclick=()=>{if(confirm("このCTIに保存した顧客・利用履歴をすべて削除しますか？")){try{localStorage.removeItem(KEY)}catch(e){}memoryDb={visits:[],customers:{}};renderQuick();renderCustomers();renderDashboard()}};
 
-function importOldData(){
- let old;try{old=JSON.parse(localStorage.getItem(OLD)||"[]")}catch{old=[]}
- if(!Array.isArray(old)||!old.length){$("oldHint").textContent="このブラウザには旧カルテデータが見つかりません。";return}
- const db=load(), existing=new Set(db.visits.map(v=>[v.date,v.time,normPhone(v.phone),v.girl,v.paid].join("|")));
- let n=0;
- old.forEach(v=>{
-   const sig=[v.date,v.time,normPhone(v.phone),v.girl,v.paid].join("|");if(existing.has(sig))return;
-   const c=ensureCustomer(db,v.phone,v.name);
-   db.visits.push({...v,customerId:c.id,id:v.id||Date.now()+"_"+Math.random().toString(36).slice(2,7)});
-   existing.add(sig);n++;
- });
- save(db);$("oldHint").textContent=`${n}件取り込みました。`;renderDashboard();
+async function bootSession(){
+  const {data:{session}}=await client.auth.getSession();
+  if(session?.user)await enterApp(session.user);else showLogin();
+  client.auth.onAuthStateChange(async(event,session)=>{
+    if(event==="SIGNED_OUT")showLogin();
+    else if(session?.user&&!currentUser)await enterApp(session.user)
+  });
 }
-$("importOld").onclick=importOldData;
+function showLogin(){currentUser=null;$("appRoot").style.display="none";$("authGate").style.display="flex";$("loginError").textContent=""}
+async function enterApp(user){currentUser=user;$("authGate").style.display="none";$("appRoot").style.display="block";$("loginEmailLabel").textContent=user.email||"ログイン済み";await refreshCloud();setGuardOk();if(pendingTel){showIncoming(pendingTel);pendingTel=""}}
+
+// UI events
+$("loginBtn").onclick=async()=>{const email=$("loginEmail").value.trim(),password=$("loginPassword").value;if(!email||!password){$("loginError").textContent="メールとパスワードを入力してください。";return}$("loginBtn").disabled=true;$("loginBtn").textContent="ログイン中…";const {error}=await client.auth.signInWithPassword({email,password});$("loginBtn").disabled=false;$("loginBtn").textContent="ログイン";if(error)$("loginError").textContent=friendlyError(error)};
+$("loginPassword").addEventListener("keydown",e=>{if(e.key==="Enter")$("loginBtn").click()});
+$("logoutBtn").onclick=async()=>{if(confirm("この端末からログアウトしますか？"))await client.auth.signOut()};
+$("syncNow").onclick=()=>refreshCloud();
+$("quickSearch").addEventListener("input",()=>{flashMessage="";renderQuick()});
+$("quickSearch").addEventListener("change",renderQuick);
+document.querySelectorAll(".tabRadio").forEach(r=>r.addEventListener("change",()=>{if(!r.checked)return;const id=r.id.replace("tab-","");if(id==="dashboard")renderDashboard();if(id==="cti")renderQuick()}));
+document.querySelectorAll(".statusbtn").forEach(b=>b.onclick=()=>{document.querySelectorAll(".statusbtn").forEach(x=>x.classList.remove("active"));b.classList.add("active");$("callStateLabel").textContent=b.dataset.status});
+$("hideCall").onclick=()=>{$("callHero").style.display="none";$("callVisitForm").style.display="none";$("pastPanel").style.display="none";$("noCall").style.display="block";currentCallPhone="";currentCustomerId=""};
+$("addFromCall").onclick=()=>fillFormFor(currentCustomerId,currentCallPhone);
+$("openCard").onclick=()=>{if(currentCustomerId)openCustomer(encodeURIComponent(currentCustomerId))};
+$("saveCallVisit").onclick=async()=>{
+  const name=$("fName").value.trim(),phone=$("fPhone").value.trim(),date=$("fDate").value;if(!name)return alert("お客様名を入力してください");if(!phone)return alert("電話番号を入力してください");if(normPhone(phone).length<10)return alert("電話番号を確認してください");if(!date)return alert("日付を入力してください");
+  const btn=$("saveCallVisit");btn.disabled=true;btn.textContent="クラウドへ保存中…";
+  try{const c=await ensureCloudCustomer(name,phone);const r=await client.from("visits").insert({customer_id:c.id,place:$("fPlace").value.trim(),visit_date:date,visit_time:$("fTime").value||null,girl:$("fGirl").value.trim(),course:Number($("fCourse").value||0)||null,paid:Number($("fPaid").value||0),memo:$("fMemo").value.trim()});if(r.error)throw r.error;await refreshCloud({quiet:true});currentCustomerId=c.id;currentCallPhone=normPhone(phone);showIncoming(phone);document.querySelectorAll(".statusbtn").forEach(x=>x.classList.toggle("active",x.dataset.status==="予約確定"));$("callStateLabel").textContent="予約確定";btn.textContent="保存しました ✓"}catch(e){alert("保存エラー："+friendlyError(e));btn.textContent="保存して受付完了"}finally{btn.disabled=false;setTimeout(()=>{btn.textContent="保存して受付完了"},1200)}
+};
+$("masterPhone").addEventListener("input",()=>{const p=normPhone($("masterPhone").value);if(!p){$("masterHint").textContent="";return}const hit=Object.values(db.customers).find(c=>normPhone(c.phone)===p);$("masterHint").innerHTML=hit?`この番号はクラウド登録済みです：<b>${esc(hit.name||"名称未登録")}</b>`:"未登録の電話番号です。"});
+$("saveMaster").onclick=async()=>{
+  const name=$("masterName").value.trim(),phone=$("masterPhone").value.trim(),note=$("masterNote").value.trim(),p=normPhone(phone);if(!name)return alert("お客様名を入力してください");if(p.length<10)return alert("電話番号を確認してください");
+  const existing=Object.values(db.customers).find(c=>normPhone(c.phone)===p);if(existing&&!confirm(`この電話番号は「${existing.name||"名称未登録"}」で登録済みです。登録内容を更新しますか？`))return;
+  const btn=$("saveMaster");btn.disabled=true;btn.textContent="クラウドへ登録中…";
+  try{let r;if(existing)r=await client.from("customers").update({name,phone:p,note:note||existing.note||"",updated_at:new Date().toISOString()}).eq("id",existing.id);else r=await client.from("customers").insert({name,phone:p,note});if(r.error)throw r.error;await refreshCloud({quiet:true});const key=last4(p);$("masterName").value="";$("masterPhone").value="";$("masterNote").value="";$("masterHint").textContent="";flashMessage=`<b>✓ クラウド顧客登録完了</b><br>${esc(name)} / ${esc(prettyPhone(p))} を登録しました。全端末から下4桁「${esc(key)}」で検索できます。`;$("quickSearch").value=key;setTab("cti");renderQuick();window.scrollTo({top:0,behavior:"smooth"});setTimeout(()=>{flashMessage="";if($("searchFlash"))$("searchFlash").style.display="none"},6000)}catch(e){alert("登録エラー："+friendlyError(e))}finally{btn.disabled=false;btn.textContent="このお客様を登録"}
+};
+$("closeModal").onclick=closeModal;$("modal").onclick=e=>{if(e.target===$("modal"))closeModal()};$("closeEdit").onclick=closeEdit;$("editModal").onclick=e=>{if(e.target===$("editModal"))closeEdit()};
+$("saveEdit").onclick=async()=>{const id=$("eId").value,name=$("eName").value.trim(),phone=normPhone($("ePhone").value),note=$("eNote").value.trim();if(!name||phone.length<10)return alert("名前と電話番号を確認してください");const collision=Object.values(db.customers).find(x=>x.id!==id&&normPhone(x.phone)===phone);if(collision)return alert("その電話番号は別のお客様に登録済みです");const r=await client.from("customers").update({name,phone,note,updated_at:new Date().toISOString()}).eq("id",id);if(r.error)return alert("更新エラー："+friendlyError(r.error));closeEdit();await refreshCloud({quiet:true});renderQuick()};
+$("testCall").onclick=()=>{const p=$("testTel").value.trim();if(!p)return alert("テストする電話番号を入力してください");showIncoming(p)};
+$("csvBtn").onclick=()=>{if(!db.visits.length)return alert("利用履歴がありません");const h=["お客様名","電話番号","利用場所","日付","時間","女の子名","コース分","支払額","受付メモ"],rows=db.visits.map(v=>{const c=db.customers[v.customerId]||{};return[c.name,c.phone,v.place,v.date,v.time,v.girl,v.course,v.paid,v.memo]}),csv="\uFEFF"+[h,...rows].map(r=>r.map(x=>`"${String(x??"").replaceAll('"','""')}"`).join(",")).join("\n");dl(new Blob([csv],{type:"text/csv;charset=utf-8"}),"platinum_phil_cti_cloud_history.csv")};
+$("jsonBtn").onclick=()=>dl(new Blob([JSON.stringify(cloneDb(),null,2)],{type:"application/json"}),"platinum_phil_cti_cloud_backup.json");
+$("jsonImport").onchange=()=>{alert("クラウド版ではJSONの直接上書きは停止しています。旧端末データは『旧ローカルデータをクラウドへ移行』を使ってください。");$("jsonImport").value=""};
+$("importOld").onclick=migrateLocal;
+$("clearAll").onclick=async()=>{if(!confirm("クラウド上の顧客・利用履歴を全端末から削除します。\n本当に削除しますか？"))return;if(!confirm("最終確認：この操作は元に戻せません。削除しますか？"))return;const a=await client.from("visits").delete().not("id","is",null);if(a.error)return alert(friendlyError(a.error));const b=await client.from("customers").delete().not("id","is",null);if(b.error)return alert(friendlyError(b.error));await refreshCloud();alert("クラウドデータを削除しました")};
+
+window.addEventListener("focus",()=>{if(currentUser)refreshCloud({quiet:true})});
+document.addEventListener("visibilitychange",()=>{if(!document.hidden&&currentUser)refreshCloud({quiet:true})});
+setInterval(()=>{if(currentUser&&!document.hidden)refreshCloud({quiet:true})},15000);
+
 try{
- const old=JSON.parse(localStorage.getItem(OLD)||"[]");
- $("oldHint").textContent=Array.isArray(old)&&old.length?`旧カルテに ${old.length}件の利用履歴があります。`:"このブラウザでは旧カルテデータは未検出です。";
-}catch{}
+  client.channel("cti-sync")
+    .on("postgres_changes",{event:"*",schema:"public",table:"customers"},()=>refreshCloud({quiet:true}))
+    .on("postgres_changes",{event:"*",schema:"public",table:"visits"},()=>refreshCloud({quiet:true}))
+    .subscribe();
+}catch(e){console.warn("Realtime fallback to polling",e)}
 
-
-
-
-window.editCustomer=function(enc){
- const id=decodeURIComponent(enc),db=load(),c=db.customers[id];if(!c)return;
- $("eId").value=id;$("eName").value=c.name||"";$("ePhone").value=c.phone||"";$("eNote").value=c.note||"";
- $("editModal").classList.add("show");
-};
-function closeEdit(){$("editModal").classList.remove("show")}
-$("closeEdit").onclick=closeEdit;
-$("editModal").onclick=e=>{if(e.target===$("editModal"))closeEdit()};
-$("saveEdit").onclick=()=>{
- const oldId=$("eId").value,db=load(),c=db.customers[oldId];if(!c)return;
- const name=$("eName").value.trim(),phone=$("ePhone").value.trim(),note=$("eNote").value.trim();
- if(!name||!phone){alert("名前と電話番号を入力してください");return}
- const newId=customerId(phone,name);
- const collision=Object.values(db.customers).find(x=>x.id!==oldId&&normPhone(x.phone)===normPhone(phone));
- if(collision){alert("その電話番号は別のお客様に登録済みです");return}
- c.name=name;c.phone=phone;c.note=note;
- if(newId!==oldId){
-   delete db.customers[oldId];c.id=newId;db.customers[newId]=c;
-   db.visits.forEach(v=>{if(v.customerId===oldId){v.customerId=newId;v.name=name;v.phone=phone}});
- }else{
-   db.visits.forEach(v=>{if(v.customerId===oldId){v.name=name;v.phone=phone}});
- }
- save(db);closeEdit();renderCustomers();renderQuick();
-};
-
-function handleUrl(){
- const p=new URLSearchParams(location.search),tel=p.get("tel");
- if(tel)showIncoming(tel);
-}
+const urlTel=new URLSearchParams(location.search).get("tel");if(urlTel)pendingTel=urlTel;
 $("fDate").value=today();$("fTime").value=nowTime();
-const guard=$("jsGuard");if(guard){guard.classList.add("ok");guard.textContent="✓ アプリ動作確認済み：顧客登録・検索を利用できます。";setTimeout(()=>{guard.style.display="none"},1800)}
-renderQuick();handleUrl();
+bootSession();
+
 </script>
 
 </body>
