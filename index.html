@@ -417,7 +417,20 @@ function paymentSummary(visits){
   return ordered.length?ordered.map((v,i)=>`${i+1}回目 ${yen(v.paid)}`).join(" / "):"支払履歴なし";
 }
 function flags(c){return `${c.vip?'<span class="flag vip">★ VIP</span>':""}${c.ng?'<span class="flag ng">! 注意</span>':""}`}
-function visitRow(v){return `<div class="visit"><div class="visitTop"><div class="visitMain">${esc(v.date)} ${esc((v.time||"").slice(0,5))}　${esc(v.girl||"女の子未入力")}</div><div class="money">${yen(v.paid)}</div></div><div class="meta">${esc(v.course||0)}分 ・ ${esc(v.place||"場所未入力")}<br>${v.memo?esc(v.memo):""}</div><div class="rowActions"><button class="btn small secondary" onclick="editVisit('${encodeURIComponent(v.id)}')">✏️ 編集</button><button class="btn small red" onclick="deleteVisit('${encodeURIComponent(v.id)}')">🗑 この履歴を削除</button></div></div>`}  const id=decodeURIComponent(enc);
+function visitRow(v){
+  return `<div class="visit">
+    <div class="visitTop">
+      <div class="visitMain">${esc(v.date)} ${esc((v.time||"").slice(0,5))}　${esc(v.girl||"女の子未入力")}</div>
+      <div class="money">${yen(v.paid)}</div>
+    </div>
+    <div class="meta">${esc(v.course||0)}分 ・ ${esc(v.place||"場所未入力")}<br>${v.memo?esc(v.memo):""}</div>
+    <div class="rowActions">
+      <button class="btn small secondary" onclick="editVisit('${encodeURIComponent(v.id)}')">✏️ 編集</button>
+      <button class="btn small red" onclick="deleteVisit('${encodeURIComponent(v.id)}')">🗑 この履歴を削除</button>
+    </div>
+  </div>`;
+}
+
 window.editVisit=function(enc){
   const id=decodeURIComponent(enc);
   const v=db.visits.find(x=>x.id===id);
@@ -430,12 +443,17 @@ window.editVisit=function(enc){
   $("vePaid").value=v.paid||"";
 
   $("visitEditModal").classList.add("show");
-}
+};
+
+window.deleteVisit=async function(enc){
+  const id=decodeURIComponent(enc);
   const v=db.visits.find(x=>x.id===id);
   if(!v)return;
+
   if(!confirm(`この利用履歴を削除しますか？\n\n${v.date} ${(v.time||"").slice(0,5)} / ${v.girl||"女の子未入力"} / ${yen(v.paid)}\n\n※この操作は元に戻せません。`))return;
 
   const customerId=v.customerId;
+
   const r=await client.from("visits").delete().eq("id",id);
 
   if(r.error){
@@ -451,7 +469,7 @@ window.editVisit=function(enc){
 
   renderQuick();
   alert("利用履歴を1件削除しました。");
-}
+};
 function matchItem(item,q){
   q=String(q||"").trim().toLowerCase(); if(!q)return true;
   const customerPhone=normPhone(item.c.phone),qDigits=digits(q);
