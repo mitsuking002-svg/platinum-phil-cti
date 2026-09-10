@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#0a0c11">
-<meta name="app-version" content="1.0.0">
+
 <title>PLATINUM PHIL CTI CRM v1</title>
 <style>
 :root{
@@ -672,28 +672,25 @@ try{
 const urlTel=new URLSearchParams(location.search).get("tel");if(urlTel)pendingTel=urlTel;
 $("fDate").value=today();$("fTime").value=nowTime();
 bootSession();
-// ===== 自動アップデート確認 =====
-const APP_VERSION_URL = "./index.html";
-let currentAppVersion = null;
+// ===== 完全自動アップデート確認 =====
+let lastAppSource = null;
 
 async function checkAppUpdate(){
   try{
-    const res = await fetch(APP_VERSION_URL + "?updateCheck=" + Date.now(), {
+    const res = await fetch("./index.html?updateCheck=" + Date.now(), {
       cache: "no-store"
     });
 
+    if(!res.ok) return;
+
     const text = await res.text();
-    const match = text.match(/<meta name="app-version" content="([^"]+)"/);
-    if(!match) return;
 
-    const latestVersion = match[1];
-
-    if(currentAppVersion === null){
-      currentAppVersion = latestVersion;
+    if(lastAppSource === null){
+      lastAppSource = text;
       return;
     }
 
-    if(latestVersion !== currentAppVersion){
+    if(text !== lastAppSource){
       location.reload();
     }
   }catch(e){
