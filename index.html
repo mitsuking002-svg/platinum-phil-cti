@@ -222,58 +222,15 @@ hr{border:0;border-top:1px solid #29313d;margin:13px 0}.footer{text-align:center
   <div id="masterHint" class="hint"></div>
  </div>
 
-</section>
-
-
-
-<section id="dashboard">
- <div class="card"><h2>顧客サマリー</h2><div id="kpis" class="kpis"></div></div>
- <div class="card"><h2>よく利用される女の子</h2><div id="girlRank"></div></div>
- <div class="card"><h2>最近30日の利用</h2><div id="recent30"></div></div>
-</section>
-
-<section id="settings">
  
- <div class="card">
-  <h2>クラウド接続</h2>
-  <div class="notice"><b>SupabaseクラウドDB接続済み</b><br>PC・タブレット・スマホから同じ顧客・利用履歴を共有します。データ操作にはスタッフログインが必要です。</div>
-  <div style="margin-top:10px" class="cloudUser">ログイン中：<span id="loginEmailLabel">—</span></div>
-  <div class="cloudRow" style="margin-top:10px"><button id="syncNow" class="btn secondary" type="button">今すぐ同期</button><button id="logoutBtn" class="btn red" type="button">ログアウト</button></div>
- </div>
 
  <div class="card">
-  <h2>03plus → このCTIの流れ</h2>
-  <div class="ctiFlow">
-    <div class="flow"><b>① 着信</b><span>03plusに電話</span></div>
-    <div class="flow"><b>② 番号送信</b><span>%TELをURLへ</span></div>
-    <div class="flow"><b>③ 自動照会</b><span>カルテ表示</span></div>
-    <div class="flow"><b>④ 受付登録</b><span>今回分だけ追加</span></div>
-  </div>
- </div>
-
- <div class="card">
-  <h2>本番時の03plus設定</h2>
-  <div class="notice">
-   03plusの着信ポップアップで「自動実行 → URLを開く」を使い、公開したCTIのURLへ <b>%TEL</b> を渡します。
-   クラウド版も <b>?tel=電話番号</b> を受け取って、ログイン後にクラウドDBから自動照会します。
-  </div>
-  <div class="code">https://mitsuking002-svg.github.io/platinum-phil-cti/?tel=%TEL</div>
-  <div class="hint">GitHub PagesのHTTPS公開URLを固定URLとして利用します。</div>
- </div>
-
- <div class="card">
-  <h2>着信テスト</h2>
-  <div class="inline"><input id="testTel" inputmode="tel" placeholder="09012345678"><button id="testCall" class="btn blue">テスト着信</button></div>
-  <div class="hint">登録済み番号でも未登録番号でもテストできます。</div>
- </div>
-
- <div class="card">
-  <h2>バックアップ</h2>
+ <h2>オーナーへデータ引き渡し</h2>
   <div class="grid2">
-    <button id="csvBtn" class="btn secondary">CSV書き出し</button>
-    <button id="jsonBtn" class="btn secondary">JSON保存</button>
-  </div>
-  <div class="field" style="margin-top:10px"><label>JSONから復元</label><input id="jsonImport" type="file" accept=".json,application/json"></div>
+  <button id="ownerCsvBtn" class="btn secondary" type="button">📄 顧客データをCSVで書き出す</button>
+  <button id="ownerJsonBtn" class="btn secondary" type="button">📦 顧客データをJSONで書き出す</button>
+</div>
+<div class="hint">オーナー側の顧客管理へ移行できるよう、顧客情報・利用履歴をファイルで書き出します。</div>
  </div>
 
  <div class="card">
@@ -609,12 +566,133 @@ $("saveMaster").onclick=async()=>{
 $("closeModal").onclick=closeModal;$("modal").onclick=e=>{if(e.target===$("modal"))closeModal()};$("closeEdit").onclick=closeEdit;$("editModal").onclick=e=>{if(e.target===$("editModal"))closeEdit()};
 $("saveEdit").onclick=async()=>{const id=$("eId").value,name=$("eName").value.trim(),phone=normPhone($("ePhone").value),note=$("eNote").value.trim();if(!name||phone.length<10)return alert("名前と電話番号を確認してください");const collision=Object.values(db.customers).find(x=>x.id!==id&&normPhone(x.phone)===phone);if(collision)return alert("その電話番号は別のお客様に登録済みです");const r=await client.from("customers").update({name,phone,note,updated_at:new Date().toISOString()}).eq("id",id);if(r.error)return alert("更新エラー："+friendlyError(r.error));closeEdit();await refreshCloud({quiet:true});renderQuick()};
 
-$("testCall").onclick=()=>{const p=$("testTel").value.trim();if(!p)return alert("テストする電話番号を入力してください");showIncoming(p)};
-$("csvBtn").onclick=()=>{if(!db.visits.length)return alert("利用履歴がありません");const h=["お客様名","電話番号","利用場所","日付","時間","女の子名","コース分","支払額","受付メモ"],rows=db.visits.map(v=>{const c=db.customers[v.customerId]||{};return[c.name,c.phone,v.place,v.date,v.time,v.girl,v.course,v.paid,v.memo]}),csv="\uFEFF"+[h,...rows].map(r=>r.map(x=>`"${String(x??"").replaceAll('"','""')}"`).join(",")).join("\n");dl(new Blob([csv],{type:"text/csv;charset=utf-8"}),"platinum_phil_cti_cloud_history.csv")};
-$("jsonBtn").onclick=()=>dl(new Blob([JSON.stringify(cloneDb(),null,2)],{type:"application/json"}),"platinum_phil_cti_cloud_backup.json");
-$("jsonImport").onchange=()=>{alert("クラウド版ではJSONの直接上書きは停止しています。旧端末データは『旧ローカルデータをクラウドへ移行』を使ってください。");$("jsonImport").value=""};
+$("ownerCsvBtn").onclick=()=>{
+  const customers=Object.values(db.customers);
+
+  if(!customers.length){
+    alert("顧客データがありません");
+    return;
+  }
+
+  const h=["顧客名","電話番号","顧客メモ","VIP","注意","利用回数","累計支払","最終利用日"];
+
+  const rows=customers.map(c=>{
+    const vs=customerVisits(c.id);
+    const s=stats(vs);
+
+    return[
+      c.name||"",
+      c.phone||"",
+      c.note||"",
+      c.vip?"1":"0",
+      c.ng?"1":"0",
+      s.count,
+      s.total,
+      s.last==="—"?"":s.last
+    ];
+  });
+
+  const csv="\uFEFF"+[h,...rows]
+    .map(r=>r.map(x=>`"${String(x??"").replaceAll('"','""')}"`).join(","))
+    .join("\n");
+
+  dl(
+    new Blob([csv],{type:"text/csv;charset=utf-8"}),
+    "platinum_phil_owner_customers.csv"
+  );
+};
+$("ownerJsonBtn").onclick=()=>{
+  const customers=Object.values(db.customers);
+
+  if(!customers.length){
+    alert("顧客データがありません");
+    return;
+  }
+
+  const data={
+    format:"PLATINUM_PHIL_CUSTOMER_EXPORT",
+    version:1,
+    exportedAt:new Date().toISOString(),
+
+    customers:customers.map(c=>{
+      const vs=customerVisits(c.id);
+      const s=stats(vs);
+
+      return{
+        name:c.name||"",
+        phone:c.phone||"",
+        note:c.note||"",
+        vip:!!c.vip,
+        caution:!!c.ng,
+        visitCount:s.count,
+        totalPaid:s.total,
+        lastVisit:s.last==="—"?"":s.last
+      };
+    }),
+
+    visits:db.visits.map(v=>{
+      const c=db.customers[v.customerId]||{};
+
+      return{
+        customerName:c.name||"",
+        phone:c.phone||"",
+        place:v.place||"",
+        date:v.date||"",
+        time:v.time||"",
+        girl:v.girl||"",
+        course:v.course||0,
+        paid:v.paid||0,
+        memo:v.memo||""
+      };
+    })
+  };
+
+  dl(
+    new Blob(
+      [JSON.stringify(data,null,2)],
+      {type:"application/json;charset=utf-8"}
+    ),
+    "platinum_phil_owner_transfer.json"
+  );
+};
 $("importOld").onclick=migrateLocal;
-$("clearAll").onclick=async()=>{if(!confirm("クラウド上の顧客・利用履歴を全端末から削除します。\n本当に削除しますか？"))return;if(!confirm("最終確認：この操作は元に戻せません。削除しますか？"))return;const a=await client.from("visits").delete().not("id","is",null);if(a.error)return alert(friendlyError(a.error));const b=await client.from("customers").delete().not("id","is",null);if(b.error)return alert(friendlyError(b.error));await refreshCloud();alert("クラウドデータを削除しました")};
+let clearAllArmed=false;
+let clearAllTimer=null;
+
+$("clearAll").onclick=async()=>{
+  const btn=$("clearAll");
+
+  if(!clearAllArmed){
+    clearAllArmed=true;
+    btn.textContent="⚠ もう一度押すと全削除";
+    btn.classList.add("dangerArmed");
+
+    clearTimeout(clearAllTimer);
+    clearAllTimer=setTimeout(()=>{
+      clearAllArmed=false;
+      btn.textContent="クラウドの全データを削除";
+      btn.classList.remove("dangerArmed");
+    },8000);
+
+    return;
+  }
+
+  clearAllArmed=false;
+  clearTimeout(clearAllTimer);
+  btn.textContent="クラウドの全データを削除";
+  btn.classList.remove("dangerArmed");
+
+  if(!confirm("最終確認：クラウド上の顧客・利用履歴をすべて削除します。\nこの操作は元に戻せません。"))return;
+
+  const a=await client.from("visits").delete().not("id","is",null);
+  if(a.error)return alert(friendlyError(a.error));
+
+  const b=await client.from("customers").delete().not("id","is",null);
+  if(b.error)return alert(friendlyError(b.error));
+
+  await refreshCloud();
+  alert("クラウドデータを削除しました");
+};
 $("closeVisitEdit").onclick=()=>$("visitEditModal").classList.remove("show");
 $("visitEditModal").onclick=e=>{if(e.target===$("visitEditModal"))$("visitEditModal").classList.remove("show")};
 
