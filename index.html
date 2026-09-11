@@ -277,6 +277,13 @@ hr{border:0;border-top:1px solid #29313d;margin:13px 0}.footer{text-align:center
  </div>
 
  <div class="card">
+  <h2>オーナーへデータ引き渡し</h2>
+  <div class="grid2">
+    <button id="ownerCsvBtn" class="btn secondary" type="button">📄 顧客データをCSVで書き出す</button>
+  </div>
+  <div class="hint">オーナー側の顧客管理へ移行できるよう、顧客情報をCSVで書き出します。</div>
+</div>
+<div class="card">
   <h2>旧ローカルデータ移行</h2>
   <button id="importOld" class="btn secondary">この端末の旧データをクラウドへ移行</button>
   <div id="oldHint" class="hint">以前このブラウザで登録したローカルデータがある場合、一度だけクラウドへ移行できます。</div>
@@ -611,6 +618,41 @@ $("saveEdit").onclick=async()=>{const id=$("eId").value,name=$("eName").value.tr
 
 $("testCall").onclick=()=>{const p=$("testTel").value.trim();if(!p)return alert("テストする電話番号を入力してください");showIncoming(p)};
 $("csvBtn").onclick=()=>{if(!db.visits.length)return alert("利用履歴がありません");const h=["お客様名","電話番号","利用場所","日付","時間","女の子名","コース分","支払額","受付メモ"],rows=db.visits.map(v=>{const c=db.customers[v.customerId]||{};return[c.name,c.phone,v.place,v.date,v.time,v.girl,v.course,v.paid,v.memo]}),csv="\uFEFF"+[h,...rows].map(r=>r.map(x=>`"${String(x??"").replaceAll('"','""')}"`).join(",")).join("\n");dl(new Blob([csv],{type:"text/csv;charset=utf-8"}),"platinum_phil_cti_cloud_history.csv")};
+ $("ownerCsvBtn").onclick=()=>{
+  const customers=Object.values(db.customers);
+
+  if(!customers.length){
+    alert("顧客データがありません");
+    return;
+  }
+
+  const h=["顧客名","電話番号","顧客メモ","VIP","注意","利用回数","累計支払","最終利用日"];
+
+  const rows=customers.map(c=>{
+    const vs=customerVisits(c.id);
+    const s=stats(vs);
+
+    return[
+      c.name||"",
+      c.phone||"",
+      c.note||"",
+      c.vip?"1":"0",
+      c.ng?"1":"0",
+      s.count,
+      s.total,
+      s.last==="-"?"":s.last
+    ];
+  });
+
+  const csv="\uFEFF"+[h,...rows]
+    .map(r=>r.map(x=>`"${String(x??"").replaceAll('"','""')}"`).join(","))
+    .join("\n");
+
+  dl(
+    new Blob([csv],{type:"text/csv;charset=utf-8"}),
+    "platinum_phil_owner_customers.csv"
+  );
+}; 
 $("jsonBtn").onclick=()=>dl(new Blob([JSON.stringify(cloneDb(),null,2)],{type:"application/json"}),"platinum_phil_cti_cloud_backup.json");
 $("jsonImport").onchange=()=>{alert("クラウド版ではJSONの直接上書きは停止しています。旧端末データは『旧ローカルデータをクラウドへ移行』を使ってください。");$("jsonImport").value=""};
 $("importOld").onclick=migrateLocal;
