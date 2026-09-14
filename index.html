@@ -563,25 +563,36 @@ function customerRiskData(c){
     ?Math.round(gaps.reduce((a,b)=>a+b,0)/gaps.length)
     :0;
 
-  let score=0;
+  const baselineGap=avgGap>0?avgGap:14;
+const delayRatio=avgGap>0?(days/avgGap):(days/baselineGap);
 
-  if(visits.length>=2)score+=10;
-  if(visits.length>=4)score+=10;
-  if(total>=50000)score+=10;
-  if(total>=100000)score+=10;
+let score=0;
 
-  if(days>=30)score+=10;
-  if(days>=60)score+=10;
-  if(days>=90)score+=10;
+// ① 最重要：普段の来店周期からどれだけ遅れているか
+if(delayRatio>=2.0)score+=60;
+else if(delayRatio>=1.5)score+=45;
+else if(delayRatio>=1.2)score+=30;
+else if(delayRatio>=1.0)score+=15;
 
-  if(avgGap){
-    const ratio=days/avgGap;
-    if(ratio>=1.5)score+=10;
-    if(ratio>=2)score+=10;
-    if(ratio>=3)score+=10;
-  }
+// ② 最終利用からの日数
+if(days>=30)score+=20;
+else if(days>=14)score+=10;
 
-  score=Math.min(100,score);
+// ③ 利用回数は「分析の信頼度」として少しだけ加点
+if(visits.length>=5)score+=10;
+else if(visits.length>=3)score+=7;
+else if(visits.length>=2)score+=5;
+
+// ④ 高額客は重要度として少しだけ加点
+if(total>=100000)score+=10;
+else if(total>=50000)score+=5;
+
+// 来店周期がまだ算出できない場合は高得点にしない
+if(avgGap===0){
+  score=Math.min(score,35);
+}
+
+score=Math.min(100,score);
 
   return{
     customer:c,
