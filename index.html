@@ -593,10 +593,23 @@ if(avgGap===0){
 }
 
 score=Math.min(100,score);
+let reason="通常範囲";
 
+if(avgGap>0){
+  if(delayRatio>=2.0){
+    reason=`通常周期の${delayRatio.toFixed(1)}倍経過・大幅超過`;
+  }else if(delayRatio>=1.5){
+    reason=`通常周期の${delayRatio.toFixed(1)}倍経過・超過`;
+  }else if(delayRatio>=1.2){
+    reason=`通常周期の${delayRatio.toFixed(1)}倍経過・やや遅れ`;
+  }else if(delayRatio>=1.0){
+    reason="通常周期を少し超過";
+  }
+}
   return{
     customer:c,
     score,
+    reason,
     days,
     avgGap,
     total,
@@ -635,6 +648,9 @@ $("customerRiskRank").innerHTML=riskRows.length
         最終利用から ${r.days}日 ・ 通常周期 約${r.avgGap||"—"}日 ・
         利用${r.count}回 ・ 累計${yen(r.total)}
       </div>
+      <div class="meta" style="margin-top:6px">
+  理由：${esc(r.reason)}
+</div>
     </div>`;
   }).join("")
   :'<div class="empty">分析できるリピーター履歴がありません</div>';
