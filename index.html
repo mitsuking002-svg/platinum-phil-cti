@@ -230,6 +230,16 @@ hr{border:0;border-top:1px solid #29313d;margin:13px 0}.footer{text-align:center
  <div class="card"><h2>顧客サマリー</h2><div id="kpis" class="kpis"></div></div>
  <div class="card"><h2>よく利用される女の子</h2><div id="girlRank"></div></div>
  <div class="card"><h2>最近30日の利用</h2><div id="recent30"></div></div>
+  <div class="card">
+  <h2>女の子別 要確認スコア</h2>
+  <div class="hint">顧客の来店周期・離脱などの変化から、確認優先度を表示します。店外行為を判定するものではありません。</div>
+  <div id="girlRiskRank"></div>
+</div>
+  <div class="card">
+  <h2>顧客別 行動変化スコア</h2>
+  <div class="hint">来店周期・最終利用・利用回数・累計支払などから、普段との変化が大きい顧客を表示します。</div>
+  <div id="customerRiskRank"></div>
+</div>
 </section>
 
 <section id="settings">
@@ -526,7 +536,64 @@ function renderQuick(){
     return `<div class="masterBox"><div class="custTop"><div><div class="custName">${esc(c.name||"未登録のお客様")}</div><div class="phone">${esc(prettyPhone(c.phone))}</div></div><div style="text-align:right">${flags(c)}<div class="meta">最終 ${esc(s.last)}</div></div></div><div class="infoStrip"><div class="infoItem"><small>利用回数</small><strong>${s.count}回</strong></div><div class="infoItem"><small>累計支払</small><strong>${yen(s.total)}</strong></div><div class="infoItem"><small>よく利用</small><strong>${esc(s.fav)}</strong></div><div class="infoItem"><small>直近支払</small><strong>${visits[0]?yen(visits[0].paid):"—"}</strong></div></div>${visits.length?`<div class="notice" style="margin:10px 0"><b>各回支払</b><br>${esc(paymentSummary(visits))}</div><div class="meta" style="margin-bottom:6px"><b style="color:#f0d47c">過去利用</b></div>${recent}`:`<div class="notice" style="margin:10px 0"><b>顧客登録済み</b><br>まだ利用履歴はありません。「＋ 今回利用」から最初の利用内容を追加できます。</div>`}${c.note?`<div class="meta" style="margin-top:8px"><b>顧客メモ：</b>${esc(c.note)}</div>`:""}<div class="rowActions">${c.phone?`<a class="telLink" href="tel:${normPhone(c.phone)}"><button class="btn small green">☎ 発信</button></a>`:""}<button class="btn small secondary" onclick="openCustomer('${encodeURIComponent(c.id)}')">全履歴を見る</button><button class="btn small blue" onclick="editCustomer('${encodeURIComponent(c.id)}')">顧客編集</button><button class="btn small" onclick="useCustomer('${encodeURIComponent(c.id)}')">＋ 今回利用</button></div></div>`
   }).join("");
 }
+function riskDays(dateStr){
+  if(!dateStr)return 0;
+  const a=new Date(dateStr+"T00:00:00");
+  const b=new Date();
+  return Math.max(0,Math.floor((b-a)/(1000*60*60*24)));
+}
 
+function customerRiskData(c){
+  const visits=customerVisits(c.id);
+  if(!visits.length)return null;
+
+  const last=visits[0];
+  const days=riskDays(last.date);
+  const total=visits.reduce((a,v)=>a+Number(v.paid||0),0);
+
+  let gaps=[];
+  for(let i=0;i<visits.length-1;i++){
+    const newer=new Date(visits[i].date+"T00:00:00");
+    const older=new Date(visits[i+1].date+"T00:00:00");
+    const gap=Math.round((newer-older)/(1000*60*60*24));
+    if(gap>0)gaps.push(gap);
+  }
+
+  const avgGap=gaps.length
+    ?Math.round(gaps.reduce((a,b)=>a+b,0)/gaps.length)
+    :0;
+
+  let score=0;
+
+  if(visits.length>=2)score+=10;
+  if(visits.length>=4)score+=10;
+  if(total>=50000)score+=10;
+  if(total>=100000)score+=10;
+
+  if(days>=30)score+=10;
+  if(days>=60)score+=10;
+  if(days>=90)score+=10;
+
+  if(avgGap){
+    const ratio=days/avgGap;
+    if(ratio>=1.5)score+=10;
+    if(ratio>=2)score+=10;
+    if(ratio>=3)score+=10;
+  }
+
+  score=Math.min(100,score);
+
+  return{
+    customer:c,
+    score,
+    days,
+    avgGap,
+    total,
+    count:visits.length,
+    lastGirl:last.girl||"—",
+    lastDate:last.date||"—"
+  };
+}
 function renderDashboard(){
   const cs=Object.values(db.customers),vs=db.visits,total=vs.reduce((a,v)=>a+Number(v.paid||0),0),rep=cs.filter(c=>customerVisits(c.id).length>=2).length;
   $("kpis").innerHTML=[["顧客数",cs.length+"人","クラウド登録済み"],["総利用",vs.length+"件","全履歴"],["累計支払",yen(total),"全履歴合計"],["リピーター",rep+"人",cs.length?Math.round(rep/cs.length*100)+"%":"0%"]].map(x=>`<div class="kpi"><div class="n">${x[0]}</div><div class="v">${x[1]}</div><div class="s">${x[2]}</div></div>`).join("");
@@ -534,6 +601,90 @@ function renderDashboard(){
   $("girlRank").innerHTML=rank.length?rank.map(([g,n],i)=>`<div class="customer"><div class="custTop"><div class="custName">${i+1}. ${esc(g)}</div><div><b>${n}本</b></div></div></div>`).join(""):'<div class="empty">データなし</div>';
   const cutoff=new Date();cutoff.setDate(cutoff.getDate()-29);const csdate=cutoff.toISOString().slice(0,10),v30=vs.filter(v=>v.date>=csdate),t30=v30.reduce((a,v)=>a+Number(v.paid||0),0);
   $("recent30").innerHTML=`<div class="kpis"><div class="kpi"><div class="n">利用件数</div><div class="v">${v30.length}</div><div class="s">直近30日</div></div><div class="kpi"><div class="n">支払合計</div><div class="v">${yen(t30)}</div><div class="s">直近30日</div></div><div class="kpi"><div class="n">平均支払</div><div class="v">${yen(v30.length?Math.round(t30/v30.length):0)}</div><div class="s">1利用あたり</div></div><div class="kpi"><div class="n">女の子数</div><div class="v">${new Set(v30.map(v=>v.girl).filter(Boolean)).size}人</div><div class="s">直近30日</div></div></div>`;
+const riskRows=cs
+  .map(customerRiskData)
+  .filter(r=>r&&r.count>=2)
+  .sort((a,b)=>b.score-a.score||b.days-a.days);
+
+$("customerRiskRank").innerHTML=riskRows.length
+  ?riskRows.slice(0,30).map((r,i)=>{
+    const status=r.score>=70?"🔴 要確認":r.score>=40?"🟡 変化あり":"🟢 通常";
+    return `<div class="customer">
+      <div class="custTop">
+        <div>
+          <div class="custName">${i+1}. ${esc(r.customer.name||"名称未登録")}</div>
+          <div class="meta">最後の女の子：${esc(r.lastGirl)} / 最終利用：${esc(r.lastDate)}</div>
+        </div>
+        <div style="text-align:right">
+          <b>${r.score}%</b>
+          <div class="meta">${status}</div>
+        </div>
+      </div>
+      <div class="meta" style="margin-top:8px">
+        最終利用から ${r.days}日 ・ 通常周期 約${r.avgGap||"—"}日 ・
+        利用${r.count}回 ・ 累計${yen(r.total)}
+      </div>
+    </div>`;
+  }).join("")
+  :'<div class="empty">分析できるリピーター履歴がありません</div>';
+const girlRiskMap={};
+
+riskRows.forEach(r=>{
+  const girl=r.lastGirl;
+  if(!girl||girl==="—")return;
+
+  if(!girlRiskMap[girl]){
+    girlRiskMap[girl]=[];
+  }
+
+  girlRiskMap[girl].push(r);
+});
+
+const girlRiskRows=Object.entries(girlRiskMap)
+  .map(([girl,rows])=>{
+    const sorted=[...rows].sort((a,b)=>b.score-a.score);
+    const top=sorted.slice(0,3);
+
+    const score=Math.round(
+      top.reduce((a,r)=>a+r.score,0)/top.length
+    );
+
+    return{
+      girl,
+      score,
+      flagged:rows.filter(r=>r.score>=40).length,
+      total:rows.length,
+      topCustomer:sorted[0]
+    };
+  })
+  .sort((a,b)=>b.score-a.score||b.flagged-a.flagged);
+
+$("girlRiskRank").innerHTML=girlRiskRows.length
+  ?girlRiskRows.slice(0,20).map((g,i)=>{
+    const status=g.score>=70?"🔴 要確認":g.score>=40?"🟡 変化あり":"🟢 通常";
+
+    return `<div class="customer">
+      <div class="custTop">
+        <div>
+          <div class="custName">${i+1}. ${esc(g.girl)}</div>
+          <div class="meta">
+            要確認客 ${g.flagged}人 / 対象リピーター ${g.total}人
+          </div>
+        </div>
+
+        <div style="text-align:right">
+          <b>${g.score}%</b>
+          <div class="meta">${status}</div>
+        </div>
+      </div>
+
+      <div class="meta" style="margin-top:8px">
+        行動変化が最大の顧客：
+        ${esc(g.topCustomer?.customer?.name||"—")}
+      </div>
+    </div>`;
+  }).join("")
+  :'<div class="empty">分析できるデータがありません</div>';
 }
 
 function showIncoming(phone){
