@@ -954,5 +954,187 @@ setInterval(checkAppUpdate, 60000);
 
 </script>
 
+<script>
+(() => {
+  const RESULT_LABELS = {
+    reserved: '予約成立',
+    cancel_after_booking: '予約後キャンセル',
+    girl_off: '女の子休み・出勤なし',
+    cannot_wait: '待ち時間が合わない',
+    unavailable: '案内できない・満了',
+    price_decline: '料金で見送り',
+    inquiry_only: '問い合わせのみ',
+    other: 'その他'
+  };
+
+  const style = document.createElement('style');
+  style.textContent = `
+    .tabs{grid-template-columns:repeat(5,1fr)!important}
+    #tab-inquiries:checked ~ .tabs label[for="tab-inquiries"]{
+      background:linear-gradient(180deg,#27271f,#1e211f);color:#f0d27b;border-color:#6b5830;
+      box-shadow:0 6px 18px rgba(0,0,0,.22),inset 0 0 0 1px rgba(255,255,255,.03)
+    }
+    #tab-inquiries:checked ~ #inquiries{display:block}
+    .inqResult{font-weight:900;color:#f0d47c}
+    .inqStats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px}
+    @media(max-width:720px){.inqStats{grid-template-columns:1fr 1fr}}
+  `;
+  document.head.appendChild(style);
+
+  const nav = document.querySelector('.tabs');
+  if (!nav || document.getElementById('tab-inquiries')) return;
+
+  const radio = document.createElement('input');
+  radio.className = 'tabRadio';
+  radio.type = 'radio';
+  radio.name = 'mainTab';
+  radio.id = 'tab-inquiries';
+  nav.parentNode.insertBefore(radio, nav);
+
+  const label = document.createElement('label');
+  label.className = 'tab';
+  label.htmlFor = 'tab-inquiries';
+  label.innerHTML = '<span class="ico">📝</span><span class="lbl">問い合わせ</span>';
+  nav.appendChild(label);
+
+  const section = document.createElement('section');
+  section.id = 'inquiries';
+  section.innerHTML = `
+    <div class="card">
+      <h2>問い合わせ実績</h2>
+      <div class="notice">遊ぶ意思があって電話をくれたお客様を、実利用とは別に記録します。0円利用にはしないので、利用回数・売上統計には混ざりません。</div>
+      <div class="grid2" style="margin-top:12px">
+        <div class="field"><label>お客様名</label><input id="iqName" placeholder="未登録なら空欄でもOK"></div>
+        <div class="field"><label>電話番号</label><input id="iqPhone" inputmode="tel"></div>
+        <div class="field"><label>日付</label><input id="iqDate" type="date"></div>
+        <div class="field"><label>時間</label><input id="iqTime" type="time"></div>
+        <div class="field"><label>目当ての女の子</label><input id="iqGirl" placeholder="例：ゆき"></div>
+        <div class="field"><label>受付結果</label>
+          <select id="iqResult">
+            <option value="reserved">予約成立</option>
+            <option value="cancel_after_booking">予約後キャンセル</option>
+            <option value="girl_off">女の子休み・出勤なし</option>
+            <option value="cannot_wait">待ち時間が合わない</option>
+            <option value="unavailable">案内できない・満了</option>
+            <option value="price_decline">料金で見送り</option>
+            <option value="inquiry_only">問い合わせのみ</option>
+            <option value="other">その他</option>
+          </select>
+        </div>
+      </div>
+      <div class="field"><label>受付メモ</label><textarea id="iqMemo" placeholder="例：ゆき希望／90分希望／22時まで待てず"></textarea></div>
+      <div class="grid2">
+        <button id="iqUseCall" class="btn secondary" type="button">📞 現在の着信をセット</button>
+        <button id="iqSave" class="btn" type="button">問い合わせ実績を保存</button>
+      </div>
+      <div id="iqHint" class="hint"></div>
+    </div>
+    <div class="card"><h2>問い合わせ集計</h2><div id="iqStats" class="inqStats"></div></div>
+    <div class="card"><h2>最近の問い合わせ</h2><div id="iqList"></div></div>
+  `;
+  const footer = document.querySelector('.footer');
+  footer.parentNode.insertBefore(section, footer);
+
+  const iq = id => document.getElementById(id);
+  const fmtPhone = s => typeof prettyPhone === 'function' ? prettyPhone(s) : (s || '');
+  const safe = s => typeof esc === 'function' ? esc(s) : String(s ?? '');
+  let inquiries = [];
+
+  function initInquiryForm(){
+    iq('iqDate').value = typeof today === 'function' ? today() : new Date().toISOString().slice(0,10);
+    iq('iqTime').value = typeof nowTime === 'function' ? nowTime() : new Date().toTimeString().slice(0,5);
+  }
+
+  function currentCustomerForPhone(phone){
+    const p = typeof normPhone === 'function' ? normPhone(phone) : String(phone||'').replace(/\D/g,'');
+    return Object.values(db?.customers || {}).find(c => {
+      const cp = typeof normPhone === 'function' ? normPhone(c.phone) : String(c.phone||'').replace(/\D/g,'');
+      return cp === p;
+    }) || null;
+  }
+
+  async function loadInquiries(){
+    if (typeof currentUser !== 'undefined' && !currentUser) return;
+    const r = await client.from('inquiries')
+      .select('id,customer_id,phone,customer_name,inquiry_date,inquiry_time,girl,result,memo,source,created_at')
+      .order('inquiry_date',{ascending:false})
+      .order('inquiry_time',{ascending:false})
+      .limit(200);
+    if (r.error){ iq('iqHint').textContent = '読込エラー：' + (typeof friendlyError === 'function' ? friendlyError(r.error) : r.error.message); return; }
+    inquiries = r.data || [];
+    renderInquiries();
+  }
+
+  function renderInquiries(){
+    const total = inquiries.length;
+    const reserved = inquiries.filter(x => x.result === 'reserved').length;
+    const cancels = inquiries.filter(x => x.result === 'cancel_after_booking').length;
+    const conversion = total ? Math.round(reserved / total * 100) : 0;
+    iq('iqStats').innerHTML = [
+      ['問い合わせ', total + '件', '直近200件'],
+      ['予約成立', reserved + '件', '成約'],
+      ['キャンセル', cancels + '件', '予約後'],
+      ['成約率', conversion + '%', '予約成立 ÷ 問い合わせ']
+    ].map(x => `<div class="kpi"><div class="n">${x[0]}</div><div class="v">${x[1]}</div><div class="s">${x[2]}</div></div>`).join('');
+
+    iq('iqList').innerHTML = inquiries.length ? inquiries.slice(0,50).map(x => `
+      <div class="customer">
+        <div class="custTop">
+          <div><div class="custName">${safe(x.customer_name || '名称未登録')}</div><div class="phone">${safe(fmtPhone(x.phone))}</div></div>
+          <div style="text-align:right"><div class="inqResult">${safe(RESULT_LABELS[x.result] || x.result)}</div><div class="meta">${safe(x.inquiry_date)} ${safe((x.inquiry_time||'').slice(0,5))}</div></div>
+        </div>
+        <div class="meta" style="margin-top:7px">希望：${safe(x.girl || '指定なし')}${x.memo ? '　／　' + safe(x.memo) : ''}</div>
+      </div>
+    `).join('') : '<div class="empty">問い合わせ実績はまだありません。</div>';
+  }
+
+  iq('iqUseCall').addEventListener('click', () => {
+    const phone = (typeof currentCallPhone !== 'undefined' ? currentCallPhone : '') || '';
+    iq('iqPhone').value = phone;
+    const c = currentCustomerForPhone(phone);
+    iq('iqName').value = c?.name || '';
+    iq('iqHint').textContent = phone ? '現在の着信情報をセットしました。' : '現在の着信番号がありません。';
+  });
+
+  iq('iqSave').addEventListener('click', async () => {
+    const phone = iq('iqPhone').value.trim();
+    const name = iq('iqName').value.trim();
+    const c = currentCustomerForPhone(phone);
+    const payload = {
+      customer_id: c?.id || null,
+      phone: typeof normPhone === 'function' ? normPhone(phone) : phone.replace(/\D/g,''),
+      customer_name: name || c?.name || '',
+      inquiry_date: iq('iqDate').value,
+      inquiry_time: iq('iqTime').value || null,
+      girl: iq('iqGirl').value.trim(),
+      result: iq('iqResult').value,
+      memo: iq('iqMemo').value.trim(),
+      source: 'phone'
+    };
+    if (!payload.phone){ iq('iqHint').textContent = '電話番号を入力してください。'; return; }
+    if (!payload.inquiry_date){ iq('iqHint').textContent = '日付を入力してください。'; return; }
+    iq('iqSave').disabled = true;
+    iq('iqHint').textContent = '保存中…';
+    const r = await client.from('inquiries').insert(payload);
+    iq('iqSave').disabled = false;
+    if (r.error){ iq('iqHint').textContent = '保存エラー：' + (typeof friendlyError === 'function' ? friendlyError(r.error) : r.error.message); return; }
+    iq('iqHint').textContent = '保存しました。利用履歴とは別に集計されます。';
+    iq('iqGirl').value = '';
+    iq('iqMemo').value = '';
+    initInquiryForm();
+    await loadInquiries();
+  });
+
+  radio.addEventListener('change', () => { if (radio.checked) loadInquiries(); });
+  try{
+    client.channel('cti-inquiries-sync')
+      .on('postgres_changes',{event:'*',schema:'public',table:'inquiries'},()=>{ if(radio.checked) loadInquiries(); })
+      .subscribe();
+  }catch(e){ console.warn('Inquiry realtime fallback', e); }
+
+  initInquiryForm();
+})();
+</script>
+
 </body>
 </html>
