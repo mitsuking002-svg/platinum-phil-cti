@@ -957,15 +957,16 @@ setInterval(checkAppUpdate, 60000);
 <script>
 (() => {
   const RESULT_LABELS = {
-    reserved: '予約成立',
-    cancel_after_booking: '予約後キャンセル',
-    girl_off: '女の子休み・出勤なし',
-    cannot_wait: '待ち時間が合わない',
-    unavailable: '案内できない・満了',
-    price_decline: '料金で見送り',
-    inquiry_only: '問い合わせのみ',
-    other: 'その他'
-  };
+  reserved: '予約成立',
+  store_reason: 'お店都合',
+  same_day_absence: '当日欠勤',
+  time_mismatch: 'お時間合わず',
+  fully_booked: 'ご予約満了',
+  price_decline: '料金帯見送り',
+  inquiry_only: '問い合わせのみ',
+  kagemusha_simultaneous: '影武者同時受け',
+  menstrual_early_leave: '生理早退'
+};
 
   const style = document.createElement('style');
   style.textContent = `
@@ -1012,13 +1013,14 @@ setInterval(checkAppUpdate, 60000);
         <div class="field"><label>受付結果</label>
           <select id="iqResult">
             <option value="reserved">予約成立</option>
-            <option value="cancel_after_booking">予約後キャンセル</option>
-            <option value="girl_off">女の子休み・出勤なし</option>
-            <option value="cannot_wait">待ち時間が合わない</option>
-            <option value="unavailable">案内できない・満了</option>
-            <option value="price_decline">料金で見送り</option>
+            <option value="store_reason">お店都合</option>
+            <option value="same_day_absence">当日欠勤</option>
+            <option value="time_mismatch">お時間合わず</option>
+            <option value="fully_booked">ご予約満了</option>
+            <option value="price_decline">料金帯見送り</option>
             <option value="inquiry_only">問い合わせのみ</option>
-            <option value="other">その他</option>
+            <option value="kagemusha_simultaneous">影武者同時受け</option>
+            <option value="menstrual_early_leave">生理早退</option>
           </select>
         </div>
       </div>
@@ -1067,15 +1069,34 @@ setInterval(checkAppUpdate, 60000);
 
   function renderInquiries(){
     const total = inquiries.length;
-    const reserved = inquiries.filter(x => x.result === 'reserved').length;
-    const cancels = inquiries.filter(x => x.result === 'cancel_after_booking').length;
-    const conversion = total ? Math.round(reserved / total * 100) : 0;
-    iq('iqStats').innerHTML = [
-      ['問い合わせ', total + '件', '直近200件'],
-      ['予約成立', reserved + '件', '成約'],
-      ['キャンセル', cancels + '件', '予約後'],
-      ['成約率', conversion + '%', '予約成立 ÷ 問い合わせ']
-    ].map(x => `<div class="kpi"><div class="n">${x[0]}</div><div class="v">${x[1]}</div><div class="s">${x[2]}</div></div>`).join('');
+
+const statOrder = [
+  'reserved',
+  'store_reason',
+  'same_day_absence',
+  'time_mismatch',
+  'fully_booked',
+  'price_decline',
+  'inquiry_only',
+  'kagemusha_simultaneous',
+  'menstrual_early_leave'
+];
+
+const counts = Object.fromEntries(
+  statOrder.map(key => [
+    key,
+    inquiries.filter(x => x.result === key).length
+  ])
+);
+
+iq('iqStats').innerHTML = [
+  ['問い合わせ', total + '件', '直近200件'],
+  ...statOrder.map(key => [
+    RESULT_LABELS[key],
+    counts[key] + '件',
+    '受付結果'
+  ])
+].map(x => `<div class="kpi"><div class="n">${x[0]}</div><div class="v">${x[1]}</div><div class="s">${x[2]}</div></div>`).join('');
 
     iq('iqList').innerHTML = inquiries.length ? inquiries.slice(0,50).map(x => `
       <div class="customer">
@@ -1135,6 +1156,205 @@ setInterval(checkAppUpdate, 60000);
   initInquiryForm();
 })();
 </script>
+<script>
+(() => {
+  const HISTORY_RESULT_LABELS = {
+  reserved: '予約成立',
+  store_reason: 'お店都合',
+  same_day_absence: '当日欠勤',
+  time_mismatch: 'お時間合わず',
+  fully_booked: 'ご予約満了',
+  price_decline: '料金帯見送り',
+  inquiry_only: '問い合わせのみ',
+  kagemusha_simultaneous: '影武者同時受け',
+  menstrual_early_leave: '生理早退'
+};
 
+  let historyInquiries = [];
+
+  function historyNormPhone(s){
+    return typeof normPhone === 'function'
+      ? normPhone(s)
+      : String(s || '').replace(/\D/g, '');
+  }
+
+  function inquiryRowsForCustomer(c){
+  const cp = historyNormPhone(c?.phone);
+
+  return historyInquiries.filter(x =>
+    x.result !== 'reserved' && (
+      (x.customer_id && x.customer_id === c.id) ||
+      (cp && historyNormPhone(x.phone) === cp)
+    )
+  );
+}
+
+  function historySortKey(x){
+    return `${x.date || ''}${String(x.time || '').slice(0,5)}`;
+  }
+
+  function mergedRecentRows(c, visits){
+    const rows = [
+      ...visits.map(v => ({
+        kind: 'visit',
+        date: v.date || '',
+        time: v.time || '',
+        data: v
+      })),
+      ...inquiryRowsForCustomer(c).map(x => ({
+        kind: 'inquiry',
+        date: x.inquiry_date || '',
+        time: x.inquiry_time || '',
+        data: x
+      }))
+    ];
+
+    rows.sort((a,b) => historySortKey(b).localeCompare(historySortKey(a)));
+
+    return rows.slice(0,8).map(row => {
+      if(row.kind === 'visit'){
+        const v = row.data;
+        return `<div class="visit">
+          <div class="visitTop">
+            <div class="visitMain">${esc(v.date)} ${esc((v.time||'').slice(0,5))}　${esc(v.girl||'女の子未入力')}</div>
+            <div class="money">${yen(v.paid)}</div>
+          </div>
+          <div class="meta">${esc(v.course||0)}分 ・ ${esc(v.place||'場所未入力')}${v.memo?`　${esc(v.memo)}`:''}</div>
+        </div>`;
+      }
+
+      const x = row.data;
+      const label = HISTORY_RESULT_LABELS[x.result] || x.result || '問い合わせ';
+      return `<div class="visit">
+        <div class="visitTop">
+          <div class="visitMain">${esc(x.inquiry_date)} ${esc((x.inquiry_time||'').slice(0,5))}　${esc(x.girl||'女の子指定なし')}</div>
+          <div class="money">${esc(label)}</div>
+        </div>
+        <div class="meta">問い合わせ${x.memo?` ・ ${esc(x.memo)}`:''}</div>
+      </div>`;
+    }).join('');
+  }
+
+  async function loadHistoryInquiries(){
+    if(typeof currentUser !== 'undefined' && !currentUser) return;
+
+    const r = await client.from('inquiries')
+      .select('id,customer_id,phone,customer_name,inquiry_date,inquiry_time,girl,result,memo,created_at')
+      .order('inquiry_date',{ascending:false})
+      .order('inquiry_time',{ascending:false})
+      .limit(500);
+
+    if(r.error){
+      console.warn('問い合わせ履歴読込エラー', r.error);
+      return;
+    }
+
+    historyInquiries = r.data || [];
+
+    if(document.getElementById('quickSearch')?.value.trim()){
+      renderQuick();
+    }
+  }
+
+  renderQuick = function(){
+    const el = $('quickSearch');
+    if(!el) return;
+
+    const q = el.value.trim();
+
+    if(flashMessage){
+      $('searchFlash').style.display = 'block';
+      $('searchFlash').innerHTML = flashMessage;
+    }else{
+      $('searchFlash').style.display = 'none';
+      $('searchFlash').innerHTML = '';
+    }
+
+    if(!q){
+      $('quickResults').innerHTML =
+        '<div class="empty">下4桁・名前・電話番号を入力すると、ここに顧客情報と利用履歴が表示されます。</div>';
+      return;
+    }
+
+    const arr = allCustomers().filter(x => matchItem(x,q)).slice(0,30);
+
+    if(!arr.length){
+      $('quickResults').innerHTML =
+        '<div class="empty">該当するお客様はいません。未登録の場合は「顧客登録」タブから登録できます。</div>';
+      return;
+    }
+
+    $('quickResults').innerHTML = arr.map(item => {
+      const {c,visits} = item;
+      const s = stats(visits);
+      const inquiryCount = inquiryRowsForCustomer(c).length;
+      const recent = mergedRecentRows(c, visits);
+
+      let historyHead = '';
+      if(visits.length){
+        historyHead = `<div class="notice" style="margin:10px 0">
+          <b>各回支払</b><br>${esc(paymentSummary(visits))}
+        </div>`;
+      }else if(inquiryCount){
+        historyHead = `<div class="notice" style="margin:10px 0">
+          <b>利用実績はまだありません</b><br>問い合わせ履歴 ${inquiryCount}件
+        </div>`;
+      }else{
+        historyHead = `<div class="notice" style="margin:10px 0">
+          <b>顧客登録済み</b><br>まだ利用履歴はありません。「＋ 今回利用」から最初の利用内容を追加できます。
+        </div>`;
+      }
+
+      const historyBlock = (visits.length || inquiryCount)
+        ? `<div class="meta" style="margin-bottom:6px"><b style="color:#f0d47c">過去利用・問い合わせ</b></div>${recent}`
+        : '';
+
+      return `<div class="masterBox">
+        <div class="custTop">
+          <div>
+            <div class="custName">${esc(c.name||'未登録のお客様')}</div>
+            <div class="phone">${esc(prettyPhone(c.phone))}</div>
+          </div>
+          <div style="text-align:right">
+            ${flags(c)}
+            <div class="meta">最終 ${esc(s.last)}</div>
+          </div>
+        </div>
+
+        <div class="infoStrip">
+          <div class="infoItem"><small>利用回数</small><strong>${s.count}回</strong></div>
+          <div class="infoItem"><small>累計支払</small><strong>${yen(s.total)}</strong></div>
+          <div class="infoItem"><small>よく利用</small><strong>${esc(s.fav)}</strong></div>
+          <div class="infoItem"><small>直近支払</small><strong>${visits[0]?yen(visits[0].paid):'—'}</strong></div>
+        </div>
+
+        ${historyHead}
+        ${historyBlock}
+
+        ${c.note?`<div class="meta" style="margin-top:8px"><b>顧客メモ：</b>${esc(c.note)}</div>`:''}
+
+        <div class="rowActions">
+          ${c.phone?`<a class="telLink" href="tel:${normPhone(c.phone)}"><button class="btn small green">☎ 発信</button></a>`:''}
+          <button class="btn small secondary" onclick="openCustomer('${encodeURIComponent(c.id)}')">全履歴を見る</button>
+          <button class="btn small blue" onclick="editCustomer('${encodeURIComponent(c.id)}')">顧客編集</button>
+          <button class="btn small" onclick="useCustomer('${encodeURIComponent(c.id)}')">＋ 今回利用</button>
+        </div>
+      </div>`;
+    }).join('');
+  };
+
+  loadHistoryInquiries();
+  window.addEventListener('focus', loadHistoryInquiries);
+  setInterval(loadHistoryInquiries, 15000);
+
+  try{
+    client.channel('cti-history-inquiries-sync')
+      .on('postgres_changes',{event:'*',schema:'public',table:'inquiries'},loadHistoryInquiries)
+      .subscribe();
+  }catch(e){
+    console.warn('問い合わせ統合履歴 realtime fallback', e);
+  }
+})();
+</script>
 </body>
 </html>
