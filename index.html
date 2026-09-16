@@ -175,6 +175,20 @@ hr{border:0;border-top:1px solid #29313d;margin:13px 0}.footer{text-align:center
 
  <div id="callVisitForm" class="card" style="display:none">
    <h2>今回の利用を登録</h2>
+   <div class="field">
+  <label>受付結果</label>
+  <select id="fResult">
+    <option value="reserved">予約成立</option>
+    <option value="store_reason">お店都合</option>
+    <option value="same_day_absence">当日欠勤</option>
+    <option value="time_mismatch">お時間合わず</option>
+    <option value="fully_booked">ご予約満了</option>
+    <option value="price_decline">料金帯見送り</option>
+    <option value="inquiry_only">問い合わせのみ</option>
+    <option value="kagemusha_simultaneous">影武者同時受け</option>
+    <option value="menstrual_early_leave">生理早退</option>
+  </select>
+</div>
    <div class="grid2">
      <div class="field"><label>お客様名</label><input id="fName" placeholder="初回だけ入力"></div>
      <div class="field"><label>電話番号</label><input id="fPhone" inputmode="tel"></div>
@@ -744,8 +758,25 @@ function showIncoming(phone){
   else{$("callerName").textContent="未登録のお客様";$("callerFlags").innerHTML="";$("callerSub").textContent="新規番号です。予約が決まったら名前と利用内容を登録してください。";$("callerSummary").innerHTML='<div class="sum"><small>利用回数</small><b>0回</b></div><div class="sum"><small>累計支払</small><b>¥0</b></div><div class="sum"><small>最終利用</small><b>—</b></div>';$("pastPanel").style.display="none";$("openCard").disabled=true}
   $("callVisitForm").style.display="none";document.querySelectorAll(".statusbtn").forEach(b=>b.classList.toggle("active",b.dataset.status==="着信"));$("callStateLabel").textContent="着信中 / 顧客照会";setTab("cti")
 }
-function fillFormFor(id,phone){const c=db.customers[id];$("fName").value=c?.name||"";$("fPhone").value=c?.phone||phone||"";$("fDate").value=today();$("fTime").value=nowTime();$("fPlace").value="";$("fGirl").value="";$("fCourse").value="";$("fPaid").value="";$("fMemo").value="";$("callVisitForm").style.display="block";setTimeout(()=>$("fPlace").focus(),100)}
+function fillFormFor(id,phone){
+  const c=db.customers[id];
 
+  $("fResult").value="reserved";
+  $("saveCallVisit").textContent="保存して受付完了";
+
+  $("fName").value=c?.name||"";
+  $("fPhone").value=c?.phone||phone||"";
+  $("fDate").value=today();
+  $("fTime").value=nowTime();
+  $("fPlace").value="";
+  $("fGirl").value="";
+  $("fCourse").value="";
+  $("fPaid").value="";
+  $("fMemo").value="";
+
+  $("callVisitForm").style.display="block";
+  setTimeout(()=>$("fPlace").focus(),100);
+}
 async function ensureCloudCustomer(name,phone){
   const p=normPhone(phone);let c=Object.values(db.customers).find(x=>normPhone(x.phone)===p);
   if(c){if(c.name!==name||c.phone!==p){const r=await client.from("customers").update({name,phone:p,updated_at:new Date().toISOString()}).eq("id",c.id).select().single();if(r.error)throw r.error;c=r.data}return c}
@@ -803,10 +834,115 @@ $("hideCall").onclick=()=>{$("callHero").style.display="none";$("callVisitForm")
 $("addFromCall").onclick=()=>fillFormFor(currentCustomerId,currentCallPhone);
 $("openCard").onclick=()=>{if(currentCustomerId)openCustomer(encodeURIComponent(currentCustomerId))};
 $("saveCallVisit").onclick=async()=>{
-  const name=$("fName").value.trim(),phone=$("fPhone").value.trim(),date=$("fDate").value;if(!name)return alert("お客様名を入力してください");if(!phone)return alert("電話番号を入力してください");if(normPhone(phone).length<10)return alert("電話番号を確認してください");if(!date)return alert("日付を入力してください");
-  const btn=$("saveCallVisit");btn.disabled=true;btn.textContent="クラウドへ保存中…";
-  try{const c=await ensureCloudCustomer(name,phone);const r=await client.from("visits").insert({customer_id:c.id,place:$("fPlace").value.trim(),visit_date:date,visit_time:$("fTime").value||null,girl:$("fGirl").value.trim(),course:Number($("fCourse").value||0)||null,paid:Number($("fPaid").value||0),memo:$("fMemo").value.trim()});if(r.error)throw r.error;await refreshCloud({quiet:true});currentCustomerId=c.id;currentCallPhone=normPhone(phone);showIncoming(phone);document.querySelectorAll(".statusbtn").forEach(x=>x.classList.toggle("active",x.dataset.status==="予約確定"));$("callStateLabel").textContent="予約確定";btn.textContent="保存しました ✓"}catch(e){alert("保存エラー："+friendlyError(e));btn.textContent="保存して受付完了"}finally{btn.disabled=false;setTimeout(()=>{btn.textContent="保存して受付完了"},1200)}
+  const result=$("fResult").value;
+  const name=$("fName").value.trim();
+  const phone=$("fPhone").value.trim();
+  const date=$("fDate").value;
+  const time=$("fTime").value||null;
+  const girl=$("fGirl").value.trim();
+  const memo=$("fMemo").value.trim();
+
+  if(!phone)return alert("電話番号を入力してください");
+  if(normPhone(phone).length<10)return alert("電話番号を確認してください");
+  if(!date)return alert("日付を入力してください");
+  if(result==="reserved"&&!name)return alert("予約成立の場合はお客様名を入力してください");
+
+  const btn=$("saveCallVisit");
+  btn.disabled=true;
+  btn.textContent="クラウドへ保存中…";
+
+  try{
+    let c=Object.values(db.customers).find(
+      x=>normPhone(x.phone)===normPhone(phone)
+    )||null;
+
+    if(result==="reserved"){
+      c=await ensureCloudCustomer(name,phone);
+
+      const visitR=await client.from("visits").insert({
+        customer_id:c.id,
+        place:$("fPlace").value.trim(),
+        visit_date:date,
+        visit_time:time,
+        girl:girl,
+        course:Number($("fCourse").value||0)||null,
+        paid:Number($("fPaid").value||0),
+        memo:memo
+      });
+
+      if(visitR.error)throw visitR.error;
+
+      const inquiryR=await client.from("inquiries").insert({
+        customer_id:c.id,
+        phone:normPhone(phone),
+        customer_name:name,
+        inquiry_date:date,
+        inquiry_time:time,
+        girl:girl,
+        result:"reserved",
+        memo:memo,
+        source:"phone"
+      });
+
+      if(inquiryR.error)throw inquiryR.error;
+
+      await refreshCloud({quiet:true});
+
+      currentCustomerId=c.id;
+      currentCallPhone=normPhone(phone);
+      showIncoming(phone);
+
+      document.querySelectorAll(".statusbtn").forEach(x=>
+        x.classList.toggle("active",x.dataset.status==="予約確定")
+      );
+
+      $("callStateLabel").textContent="予約確定";
+      btn.textContent="保存しました ✓";
+
+    }else{
+      const inquiryR=await client.from("inquiries").insert({
+        customer_id:c?.id||null,
+        phone:normPhone(phone),
+        customer_name:name||c?.name||"",
+        inquiry_date:date,
+        inquiry_time:time,
+        girl:girl,
+        result:result,
+        memo:memo,
+        source:"phone"
+      });
+
+      if(inquiryR.error)throw inquiryR.error;
+
+      $("quickSearch").value=last4(phone);
+      $("callHero").style.display="none";
+      $("callVisitForm").style.display="none";
+      $("pastPanel").style.display="none";
+      $("noCall").style.display="block";
+
+      renderQuick();
+      btn.textContent="問い合わせ保存済み ✓";
+    }
+
+  }catch(e){
+    alert("保存エラー："+friendlyError(e));
+  }finally{
+    btn.disabled=false;
+
+    setTimeout(()=>{
+      btn.textContent=
+        $("fResult").value==="reserved"
+        ?"保存して受付完了"
+        :"問い合わせ実績として保存";
+    },1200);
+  }
 };
+  $("fResult").addEventListener("change",()=>{
+  $("saveCallVisit").textContent=
+    $("fResult").value==="reserved"
+      ?"保存して受付完了"
+      :"問い合わせ実績として保存";
+});
 $("masterPhone").addEventListener("input",()=>{const p=normPhone($("masterPhone").value);if(!p){$("masterHint").textContent="";return}const hit=Object.values(db.customers).find(c=>normPhone(c.phone)===p);$("masterHint").innerHTML=hit?`この番号はクラウド登録済みです：<b>${esc(hit.name||"名称未登録")}</b>`:"未登録の電話番号です。"});
 $("saveMaster").onclick=async()=>{
   const name=$("masterName").value.trim(),phone=$("masterPhone").value.trim(),note=$("masterNote").value.trim(),p=normPhone(phone);if(!name)return alert("お客様名を入力してください");if(p.length<10)return alert("電話番号を確認してください");
