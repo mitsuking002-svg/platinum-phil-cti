@@ -665,6 +665,7 @@ function renderDashboard(){
 const riskRows=cs
   .map(customerRiskData)
   .filter(r=>r&&r.count>=2)
+  .filter(r=>r.score>=40)
   .sort((a,b)=>b.score-a.score||b.days-a.days);
 
 $("customerRiskRank").innerHTML=riskRows.length
