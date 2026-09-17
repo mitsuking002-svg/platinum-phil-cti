@@ -1492,5 +1492,192 @@ iq('iqStats').innerHTML = [
   }
 })();
 </script>
+  <script>
+(() => {
+  const INQUIRY_LABELS_MODAL = {
+    reserved: '予約成立',
+    store_reason: 'お店都合',
+    same_day_absence: '当日欠勤',
+    time_mismatch: 'お時間合わず',
+    fully_booked: 'ご予約満了',
+    price_decline: '料金帯見送り',
+    inquiry_only: '問い合わせのみ',
+    kagemusha_simultaneous: '影武者同時受け',
+    menstrual_early_leave: '生理早退'
+  };
+
+  let inquiryModalRows = {};
+
+  function inquiryModalRow(x){
+    const label = INQUIRY_LABELS_MODAL[x.result] || x.result || '問い合わせ';
+    return `<div class="visit">
+      <div class="visitTop">
+        <div class="visitMain">${esc(x.inquiry_date || '')} ${esc((x.inquiry_time || '').slice(0,5))}　${esc(x.girl || '女の子指定なし')}</div>
+        <div class="money">${esc(label)}</div>
+      </div>
+      <div class="meta">問い合わせ${x.memo ? ` ・ ${esc(x.memo)}` : ''}</div>
+      <div class="rowActions">
+        <button class="btn small secondary" onclick="editInquiryHistory('${encodeURIComponent(x.id)}')">✏️ 編集</button>
+        <button class="btn small red" onclick="deleteInquiryHistory('${encodeURIComponent(x.id)}')">🗑 この履歴を削除</button>
+      </div>
+    </div>`;
+  }
+
+  function ensureInquiryEditModal(){
+    if(document.getElementById('inquiryHistoryEditModal')) return;
+
+    const modal = document.createElement('div');
+    modal.id = 'inquiryHistoryEditModal';
+    modal.className = 'modal';
+    modal.innerHTML = `
+      <div class="sheet">
+        <div class="sheetHead">
+          <div>
+            <div class="sheetName">問い合わせ履歴を編集</div>
+            <div class="hint">受付結果・女の子・日付・時間・受付メモを変更できます。</div>
+          </div>
+          <button id="closeInquiryHistoryEdit" class="close">閉じる</button>
+        </div>
+        <div class="grid2" style="margin-top:14px">
+          <div class="field">
+            <label>受付結果</label>
+            <select id="iheResult">
+              <option value="store_reason">お店都合</option>
+              <option value="same_day_absence">当日欠勤</option>
+              <option value="time_mismatch">お時間合わず</option>
+              <option value="fully_booked">ご予約満了</option>
+              <option value="price_decline">料金帯見送り</option>
+              <option value="inquiry_only">問い合わせのみ</option>
+              <option value="kagemusha_simultaneous">影武者同時受け</option>
+              <option value="menstrual_early_leave">生理早退</option>
+            </select>
+          </div>
+          <div class="field"><label>女の子</label><input id="iheGirl"></div>
+          <div class="field"><label>日付</label><input id="iheDate" type="date"></div>
+          <div class="field"><label>時間</label><input id="iheTime" type="time"></div>
+        </div>
+        <div class="field"><label>受付メモ</label><textarea id="iheMemo"></textarea></div>
+        <input id="iheId" type="hidden">
+        <button id="saveInquiryHistoryEdit" class="btn">変更を保存</button>
+      </div>`;
+
+    document.body.appendChild(modal);
+    document.getElementById('closeInquiryHistoryEdit').onclick=()=>modal.classList.remove('show');
+    modal.onclick=e=>{ if(e.target===modal) modal.classList.remove('show'); };
+
+    document.getElementById('saveInquiryHistoryEdit').onclick=async()=>{
+      const id=document.getElementById('iheId').value;
+      const btn=document.getElementById('saveInquiryHistoryEdit');
+      btn.disabled=true; btn.textContent='保存中…';
+
+      const r=await client.from('inquiries').update({
+        result:document.getElementById('iheResult').value,
+        girl:document.getElementById('iheGirl').value.trim(),
+        inquiry_date:document.getElementById('iheDate').value,
+        inquiry_time:document.getElementById('iheTime').value || null,
+        memo:document.getElementById('iheMemo').value.trim()
+      }).eq('id',id);
+
+      btn.disabled=false; btn.textContent='変更を保存';
+      if(r.error){ alert('編集エラー：'+friendlyError(r.error)); return; }
+
+      modal.classList.remove('show');
+      window.dispatchEvent(new Event('focus'));
+      if(currentModalId) await window.openCustomer(encodeURIComponent(currentModalId));
+    };
+  }
+
+  window.editInquiryHistory=function(enc){
+    ensureInquiryEditModal();
+    const id=decodeURIComponent(enc);
+    const x=inquiryModalRows[id];
+    if(!x) return;
+    document.getElementById('iheId').value=x.id;
+    document.getElementById('iheResult').value=x.result;
+    document.getElementById('iheGirl').value=x.girl || '';
+    document.getElementById('iheDate').value=x.inquiry_date || '';
+    document.getElementById('iheTime').value=(x.inquiry_time || '').slice(0,5);
+    document.getElementById('iheMemo').value=x.memo || '';
+    document.getElementById('inquiryHistoryEditModal').classList.add('show');
+  };
+
+  window.deleteInquiryHistory=async function(enc){
+    const id=decodeURIComponent(enc);
+    const x=inquiryModalRows[id];
+    if(!x) return;
+    const label=INQUIRY_LABELS_MODAL[x.result] || x.result || '問い合わせ';
+    if(!confirm(`この問い合わせ履歴を削除しますか？\n\n${x.inquiry_date || ''} ${(x.inquiry_time || '').slice(0,5)} / ${label}\n\n※この操作は元に戻せません。`)) return;
+
+    const r=await client.from('inquiries').delete().eq('id',id);
+    if(r.error){ alert('削除エラー：'+friendlyError(r.error)); return; }
+
+    window.dispatchEvent(new Event('focus'));
+    if(currentModalId) await window.openCustomer(encodeURIComponent(currentModalId));
+  };
+
+  ensureInquiryEditModal();
+
+  window.openCustomer=async function(enc){
+    const id=decodeURIComponent(enc);
+    const c=db.customers[id];
+    if(!c) return;
+    currentModalId=id;
+
+    const visits=customerVisits(id);
+    const s=stats(visits);
+    const phone=normPhone(c.phone);
+
+    const [a,b]=await Promise.all([
+      client.from('inquiries').select('id,customer_id,phone,customer_name,inquiry_date,inquiry_time,girl,result,memo,created_at').eq('customer_id',id).order('inquiry_date',{ascending:false}).order('inquiry_time',{ascending:false}),
+      phone ? client.from('inquiries').select('id,customer_id,phone,customer_name,inquiry_date,inquiry_time,girl,result,memo,created_at').eq('phone',phone).order('inquiry_date',{ascending:false}).order('inquiry_time',{ascending:false}) : Promise.resolve({data:[],error:null})
+    ]);
+
+    if(a.error){ alert('問い合わせ履歴の読込エラー：'+friendlyError(a.error)); return; }
+    if(b.error){ alert('問い合わせ履歴の読込エラー：'+friendlyError(b.error)); return; }
+
+    const map={};
+    [...(a.data || []), ...(b.data || [])].forEach(x=>map[x.id]=x);
+    const inquiries=Object.values(map).filter(x=>x.result!=='reserved');
+    inquiryModalRows=Object.fromEntries(inquiries.map(x=>[x.id,x]));
+
+    const rows=[
+      ...visits.map(v=>({date:v.date || '',time:v.time || '',html:visitRow(v)})),
+      ...inquiries.map(x=>({date:x.inquiry_date || '',time:x.inquiry_time || '',html:inquiryModalRow(x)}))
+    ].sort((x,y)=>`${y.date}${String(y.time).slice(0,5)}`.localeCompare(`${x.date}${String(x.time).slice(0,5)}`));
+
+    $('mName').textContent=c.name || '名称未登録';
+    $('mPhone').textContent=prettyPhone(c.phone);
+    $('mFlags').innerHTML=flags(c);
+    $('mSummary').innerHTML=`<div class="sum"><small>利用回数</small><b>${s.count}回</b></div><div class="sum"><small>累計支払</small><b>${yen(s.total)}</b></div><div class="sum"><small>よく利用</small><b>${esc(s.fav)}</b></div>`;
+    $('mCustomerNote').style.display=c.note?'block':'none';
+    $('mCustomerNote').innerHTML=c.note?`<b>顧客メモ</b><br>${esc(c.note)}`:'';
+
+    const t=document.querySelector('#modal h3');
+    if(t) t.textContent='利用・問い合わせ履歴';
+
+    $('mHistory').innerHTML=`<div class="notice" style="margin-bottom:10px"><b>累計支払：${yen(s.total)}</b><br>各回支払：${esc(paymentSummary(visits))}</div>`+(rows.length?rows.map(x=>x.html).join(''):'<div class="empty">利用・問い合わせ履歴なし</div>');
+
+    $('mCall').href='tel:'+normPhone(c.phone);
+    $('mUse').onclick=()=>{ closeModal(); showIncoming(c.phone); fillFormFor(c.id,c.phone); };
+
+    $('vipBtn').onclick=async()=>{
+      const r=await client.from('customers').update({vip:!c.vip,updated_at:new Date().toISOString()}).eq('id',id);
+      if(r.error) return alert(friendlyError(r.error));
+      await refreshCloud({quiet:true});
+      await window.openCustomer(encodeURIComponent(id));
+    };
+
+    $('ngBtn').onclick=async()=>{
+      const r=await client.from('customers').update({ng:!c.ng,updated_at:new Date().toISOString()}).eq('id',id);
+      if(r.error) return alert(friendlyError(r.error));
+      await refreshCloud({quiet:true});
+      await window.openCustomer(encodeURIComponent(id));
+    };
+
+    $('modal').classList.add('show');
+  };
+})();
+</script>
+
 </body>
 </html>
