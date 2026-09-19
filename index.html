@@ -912,10 +912,9 @@ $("registerFromCall").onclick=async()=>{
   $("tab-customers").checked=true;
   $("tab-customers").dispatchEvent(new Event("change",{bubbles:true}));
 
-  setTimeout(()=>{
-  $("masterName").focus();
-  $("masterName").setSelectionRange(0,0);
-},100); 
+  const nameInput=$("masterName");
+nameInput.focus();
+nameInput.setSelectionRange(0,0); 
   };
 $("openCard").onclick=()=>{if(currentCustomerId)openCustomer(encodeURIComponent(currentCustomerId))};
 $("saveCallVisit").onclick=async()=>{
@@ -1028,6 +1027,22 @@ $("saveCallVisit").onclick=async()=>{
       ?"保存して受付完了"
       :"問い合わせ実績として保存";
 });
+function hiraToKata(str){
+  return str.replace(/[\u3041-\u3096]/g, ch =>
+    String.fromCharCode(ch.charCodeAt(0) + 0x60)
+  );
+}
+
+$("masterName").addEventListener("compositionend", e => {
+  const el = e.target;
+  const pos = el.selectionStart;
+
+  el.value = hiraToKata(el.value);
+
+  if(pos !== null){
+    el.setSelectionRange(pos, pos);
+  }
+});  
 $("masterPhone").addEventListener("input",()=>{const p=normPhone($("masterPhone").value);if(!p){$("masterHint").textContent="";return}const hit=Object.values(db.customers).find(c=>normPhone(c.phone)===p);$("masterHint").innerHTML=hit?`この番号はクラウド登録済みです：<b>${esc(hit.name||"名称未登録")}</b>`:"未登録の電話番号です。"});
 $("saveMaster").onclick=async()=>{
   const name=$("masterName").value.trim(),phone=$("masterPhone").value.trim(),note=$("masterNote").value.trim(),p=normPhone(phone);if(!name)return alert("お客様名を入力してください");if(p.length<10)return alert("電話番号を確認してください");
