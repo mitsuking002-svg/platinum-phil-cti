@@ -168,6 +168,7 @@ hr{border:0;border-top:1px solid #29313d;margin:13px 0}.footer{text-align:center
      <button class="statusbtn" data-status="見送り">見送り</button>
    </div>
    <div class="callActions">
+     <button class="btn blue" id="registerFromCall" type="button">👤 顧客登録へ</button>
      <button class="btn green" id="addFromCall">＋ 今回の利用を追加</button>
      <button class="btn secondary" id="openCard">過去カルテを見る</button>
    </div>
@@ -889,6 +890,30 @@ document.querySelectorAll(".tabRadio").forEach(r=>r.addEventListener("change",()
 document.querySelectorAll(".statusbtn").forEach(b=>b.onclick=()=>{document.querySelectorAll(".statusbtn").forEach(x=>x.classList.remove("active"));b.classList.add("active");$("callStateLabel").textContent=b.dataset.status});
 $("hideCall").onclick=()=>{$("callHero").style.display="none";$("callVisitForm").style.display="none";$("pastPanel").style.display="none";$("noCall").style.display="block";currentCallPhone="";currentCustomerId=""};
 $("addFromCall").onclick=()=>fillFormFor(currentCustomerId,currentCallPhone);
+$("registerFromCall").onclick=async()=>{
+  const phone=normPhone(currentCallPhone||$("callerPhone").textContent);
+
+  if(!phone){
+    alert("電話番号がありません");
+    return;
+  }
+
+  try{
+    if(navigator.clipboard?.writeText){
+      await navigator.clipboard.writeText(phone);
+    }
+  }catch(e){}
+
+  $("masterPhone").value=phone;
+  $("masterName").value="";
+  $("masterNote").value="";
+  $("masterHint").textContent="着信番号をセットしました。お客様名だけ入力して登録してください。";
+
+  $("tab-customers").checked=true;
+  $("tab-customers").dispatchEvent(new Event("change",{bubbles:true}));
+
+  setTimeout(()=>$("masterName").focus(),100);
+};  
 $("openCard").onclick=()=>{if(currentCustomerId)openCustomer(encodeURIComponent(currentCustomerId))};
 $("saveCallVisit").onclick=async()=>{
   const result=$("fResult").value;
