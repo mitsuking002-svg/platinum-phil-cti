@@ -905,15 +905,17 @@ $("registerFromCall").onclick=async()=>{
   }catch(e){}
 
   $("masterPhone").value=phone;
-  $("masterName").value="";
+  $("masterName").value=phone.slice(-4);
   $("masterNote").value="";
   $("masterHint").textContent="着信番号をセットしました。お客様名だけ入力して登録してください。";
 
   $("tab-customers").checked=true;
   $("tab-customers").dispatchEvent(new Event("change",{bubbles:true}));
 
-  setTimeout(()=>$("masterName").focus(),100);
-};  
+  setTimeout(()=>{
+  $("masterName").focus();
+  $("masterName").setSelectionRange(0,0);
+},100); 
 $("openCard").onclick=()=>{if(currentCustomerId)openCustomer(encodeURIComponent(currentCustomerId))};
 $("saveCallVisit").onclick=async()=>{
   const result=$("fResult").value;
