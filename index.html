@@ -821,7 +821,7 @@ const girlRiskRows=Object.entries(girlRiskMap)
       score,
       flagged:rows.filter(r=>r.score>=40).length,
       total:rows.length,
-      topCustomer:sorted[0]
+      topCustomers:sorted.filter(r=>r.score>=40)
     };
   })
   .sort((a,b)=>b.score-a.score||b.flagged-a.flagged);
@@ -846,8 +846,8 @@ $("girlRiskRank").innerHTML=girlRiskRows.length
       </div>
 
       <div class="meta" style="margin-top:8px">
-        行動変化が最大の顧客：
-        ${esc(g.topCustomer?.customer?.name||"—")}
+        要確認の顧客：
+${g.topCustomers.map(r=>esc(r.customer?.name||"—")).join(" / ")}
       </div>
     </div>`;
   }).join("")
