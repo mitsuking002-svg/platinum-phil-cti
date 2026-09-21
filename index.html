@@ -811,7 +811,7 @@ allRiskRows.forEach(r=>{
   });
 
   Object.entries(byGirl).forEach(([girl,girlVisits])=>{
-    if(girlVisits.length<2)return;
+    if(girlVisits.length<2 && r.lastGirl!==girl)return;
 
     const sortedGirl=[...girlVisits].sort((a,b)=>
       String(b.date||"").localeCompare(String(a.date||""))
