@@ -70,6 +70,8 @@ textarea{min-height:70px;resize:vertical}
 #visitEditModal .sheet{border-radius:22px;max-height:88vh}  
 #modal{align-items:center;padding:18px}
 #modal .sheet{border-radius:22px;max-height:88vh}
+#girlCourseModal{align-items:center;padding:18px}
+#girlCourseModal .sheet{border-radius:22px;max-height:88vh}  
 .sheet{width:100%;max-width:760px;max-height:92vh;overflow:auto;background:#11151d;border:1px solid #333b49;border-radius:22px 22px 0 0;padding:16px 14px calc(20px + env(safe-area-inset-bottom))}
 .sheetHead{display:flex;justify-content:space-between;gap:10px;align-items:start}.close{border:1px solid #384150;background:#202632;color:#eef0f5;border-radius:11px;padding:8px 10px;font-size:11px}
 .sheetName{font-size:21px;font-weight:950}.sheetPhone{color:var(--gold);font-size:13px;margin-top:2px}
@@ -254,7 +256,7 @@ hr{border:0;border-top:1px solid #29313d;margin:13px 0}.footer{text-align:center
   </div>
 </div>  
  <div class="card"><h2>顧客サマリー</h2><div id="kpis" class="kpis"></div></div>
- <div class="card"><h2>よく利用される女の子</h2><div id="girlRank"></div></div>
+ <div class="card"><h2 id="girlRankTitle">月度ランキング</h2><div id="girlRank"></div></div>
  <div class="card"><h2 id="periodUsageTitle">選択月の利用</h2><div id="recent30"></div></div>
   <div class="card">
   <h2>女の子別 要確認スコア</h2>
@@ -420,8 +422,21 @@ hr{border:0;border-top:1px solid #29313d;margin:13px 0}.footer{text-align:center
     <input id="veId" type="hidden">
 
     <button id="saveVisitEdit" class="btn">変更を保存</button>
-  </div>
 </div>
+</div>
+ <div id="girlCourseModal" class="modal">
+  <div class="sheet">
+    <div class="sheetHead">
+      <div>
+        <div id="girlCourseTitle" class="sheetName">コース内訳</div>
+        <div class="hint">選択月のコース別本数</div>
+      </div>
+      <button id="closeGirlCourse" class="close">閉じる</button>
+    </div>
+
+    <div id="girlCourseBody" style="margin-top:14px"></div>
+  </div>
+</div> 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 window.addEventListener("error",e=>{
@@ -507,7 +522,37 @@ window.editVisit=function(enc){
 
   $("visitEditModal").classList.add("show");
 };
+window.openGirlCourse=function(enc){
+  const girl=decodeURIComponent(enc);
+  const month=$("dashboardMonth").value||today().slice(0,7);
+  const monthNum=Number(month.split("-")[1]);
 
+  const rows=db.visits.filter(v=>
+    v.girl===girl &&
+    String(v.date||"").startsWith(month)
+  );
+
+  const counts={};
+
+  rows.forEach(v=>{
+    const course=Number(v.course)||0;
+    const label=course?`${course}分`:"コース未入力";
+    counts[label]=(counts[label]||0)+1;
+  });
+
+  const list=Object.entries(counts).sort((a,b)=>
+    (parseInt(a[0])||9999)-(parseInt(b[0])||9999)
+  );
+
+  $("girlCourseTitle").textContent=`${girl}｜${monthNum}月コース内訳`;
+
+  $("girlCourseBody").innerHTML=list.length
+    ?list.map(([course,n])=>`<div class="customer"><div class="custTop"><div class="custName">${esc(course)}</div><div><b>${n}本</b></div></div></div>`).join("")
+      +`<div class="notice" style="margin-top:12px"><b>合計 ${rows.length}本</b></div>`
+    :'<div class="empty">この月のデータなし</div>';
+
+  $("girlCourseModal").classList.add("show");
+};
 window.deleteVisit=async function(enc){
   const id=decodeURIComponent(enc);
   const v=db.visits.find(x=>x.id===id);
@@ -673,7 +718,7 @@ monthEl.onchange=renderDashboard;
 const month=monthEl.value;
 const [yy,mm]=month.split("-");
 const monthLabel=`${yy}年${Number(mm)}月`;
-
+$("girlRankTitle").textContent=`${Number(mm)}月度ランキング`;
 const vs=allVs.filter(v=>String(v.date||"").startsWith(month));
 
 const monthCustomers=cs.filter(c=>
@@ -705,7 +750,7 @@ const rank=Object.entries(gr)
   .slice(0,10);
 
 $("girlRank").innerHTML=rank.length
-  ?rank.map(([g,n],i)=>`<div class="customer"><div class="custTop"><div class="custName">${i+1}. ${esc(g)}</div><div><b>${n}本</b></div></div></div>`).join("")
+  ?rank.map(([g,n],i)=>`<div class="customer"><div class="custTop"><div class="custName" style="cursor:pointer;text-decoration:underline;text-underline-offset:3px" onclick="openGirlCourse('${encodeURIComponent(g)}')">${i+1}. ${esc(g)}</div><div><b>${n}本</b></div></div></div>`).join("")
   :'<div class="empty">この月のデータなし</div>';
 
 $("periodUsageTitle").textContent=monthLabel+"の利用";
@@ -1092,7 +1137,8 @@ $("importOld").onclick=migrateLocal;
 $("clearAll").onclick=async()=>{if(!confirm("クラウド上の顧客・利用履歴を全端末から削除します。\n本当に削除しますか？"))return;if(!confirm("最終確認：この操作は元に戻せません。削除しますか？"))return;const a=await client.from("visits").delete().not("id","is",null);if(a.error)return alert(friendlyError(a.error));const b=await client.from("customers").delete().not("id","is",null);if(b.error)return alert(friendlyError(b.error));await refreshCloud();alert("クラウドデータを削除しました")};
 $("closeVisitEdit").onclick=()=>$("visitEditModal").classList.remove("show");
 $("visitEditModal").onclick=e=>{if(e.target===$("visitEditModal"))$("visitEditModal").classList.remove("show")};
-
+$("closeGirlCourse").onclick=()=>$("girlCourseModal").classList.remove("show");
+$("girlCourseModal").onclick=e=>{if(e.target===$("girlCourseModal"))$("girlCourseModal").classList.remove("show")};
 $("saveVisitEdit").onclick=async()=>{
   const id=$("veId").value;
   const v=db.visits.find(x=>x.id===id);
