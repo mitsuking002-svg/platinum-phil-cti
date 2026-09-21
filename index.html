@@ -702,6 +702,7 @@ if(avgGap>0){
     reason,
     days,
     avgGap,
+    delayRatio,
     total,
     count:visits.length,
     lastGirl:last.girl||"—",
@@ -865,6 +866,14 @@ const girlRiskRows=Object.entries(girlRiskMap)
     }
 
     let score=0;
+    const maxDelayRatio=Math.max(
+  0,
+  ...flaggedRows.map(r=>Number(r.delayRatio||0))
+);
+
+if(maxDelayRatio>=2.0)score+=30;
+else if(maxDelayRatio>=1.5)score+=20;
+else if(maxDelayRatio>=1.2)score+=10;
 
     if(flagged>=3)score+=50;
     else if(flagged===2)score+=30;
@@ -884,10 +893,12 @@ const girlRiskRows=Object.entries(girlRiskMap)
     score=Math.max(0,Math.min(100,score));
 
     const reasons=[];
-
-    if(flagged>=3)reasons.push(`要確認の固定客が${flagged}人`);
-    else if(flagged===2)reasons.push("要確認の固定客が2人");
-    else if(flagged===1)reasons.push("要確認の固定客が1人");
+　　if(maxDelayRatio>=2.0)reasons.push(`周期乱れ 最大${maxDelayRatio.toFixed(1)}倍`);
+else if(maxDelayRatio>=1.5)reasons.push(`周期乱れ 最大${maxDelayRatio.toFixed(1)}倍`);
+else if(maxDelayRatio>=1.2)reasons.push(`周期乱れ 最大${maxDelayRatio.toFixed(1)}倍`);
+    if(flagged>=3)reasons.push(`要確認客が${flagged}人`);
+else if(flagged===2)reasons.push("要確認客が2人");
+else if(flagged===1)reasons.push("要確認客が1人");
 
     if(flaggedRate>=0.5){
       reasons.push(`要確認率${Math.round(flaggedRate*100)}%`);
