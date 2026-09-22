@@ -929,7 +929,7 @@ else if(flagged===1)reasons.push("要確認客が1人");
   .sort((a,b)=>b.score-a.score||b.flagged-a.flagged);
 
 $("girlRiskRank").innerHTML=girlRiskRows.length
-  ?girlRiskRows.slice(0,20).map((g,i)=>{
+  ?girlRiskRows.filter(g=>g.score>=40).slice(0,20).map((g,i)=>{
     const status=g.score>=70?"🔴 要確認":g.score>=40?"🟡 変化あり":"🟢 通常";
 
     return `<div class="customer">
