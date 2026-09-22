@@ -842,14 +842,71 @@ const girlRiskRows=Object.entries(girlRiskMap)
 
     const fixed=rows.length;
 
-    const flaggedRows=rows
-      .filter(r=>r.score>=40&&!r.movedElsewhere)
+        // 直近3回の来店ペースを計算
+    const enrichedRows=rows.map(r=>{
+      const vs=customerVisits(r.customer.id);
+      const recentGaps=[];
+
+      for(let i=0;i<Math.min(vs.length-1,3);i++){
+        const newer=new Date(vs[i].date+"T00:00:00");
+        const older=new Date(vs[i+1].date+"T00:00:00");
+        const gap=Math.round(
+          (newer-older)/(1000*60*60*24)
+        );
+
+        if(gap>0)recentGaps.push(gap);
+      }
+
+      const recentAvgGap=recentGaps.length
+        ?recentGaps.reduce((a,b)=>a+b,0)/recentGaps.length
+        :0;
+
+      const recentDelayRatio=
+        recentAvgGap>0
+          ?r.days/recentAvgGap
+          :0;
+
+      return{
+        ...r,
+        recentAvgGap,
+        recentDelayRatio
+      };
+    });
+
+    // 最後にこの女性を利用してから
+    // 店全体への来店が止まっている常連客
+    const isStoppedAfterGirl=r=>
+      !r.movedElsewhere &&
+      r.lastGirl===girl &&
+      r.days>=7 &&
+      r.recentAvgGap>0 &&
+      r.recentDelayRatio>=1.0;
+
+    const flaggedRows=enrichedRows
+      .filter(r=>
+        !r.movedElsewhere &&
+        (
+          r.score>=40 ||
+          isStoppedAfterGirl(r)
+        )
+      )
       .sort((a,b)=>b.score-a.score);
 
     const flagged=flaggedRows.length;
-    const redCount=flaggedRows.filter(r=>r.score>=70).length;
-    const movedCount=rows.filter(r=>r.movedElsewhere).length;
-    const flaggedRate=fixed?flagged/fixed:0;
+
+    const stoppedRows=
+      flaggedRows.filter(isStoppedAfterGirl);
+
+    const stoppedCount=stoppedRows.length;
+
+    const redCount=
+      flaggedRows.filter(r=>r.score>=70).length;
+
+    const movedCount=
+      rows.filter(r=>r.movedElsewhere).length;
+
+    const flaggedRate=
+      fixed?flagged/fixed:0;
 
     const dates=flaggedRows
       .map(r=>r.lastGirlDate)
@@ -861,23 +918,34 @@ const girlRiskRows=Object.entries(girlRiskMap)
 
     if(dates.length>=2){
       clusterDays=Math.round(
-        (dates[dates.length-1]-dates[0])/(1000*60*60*24)
+        (dates[dates.length-1]-dates[0])/
+        (1000*60*60*24)
       );
     }
 
     let score=0;
-    const maxDelayRatio=Math.max(
-  0,
-  ...flaggedRows.map(r=>Number(r.delayRatio||0))
-);
 
-if(maxDelayRatio>=2.0)score+=30;
-else if(maxDelayRatio>=1.5)score+=20;
-else if(maxDelayRatio>=1.2)score+=10;
+    const maxDelayRatio=Math.max(
+      0,
+      ...flaggedRows.map(r=>
+        Math.max(
+          Number(r.delayRatio||0),
+          Number(r.recentDelayRatio||0)
+        )
+      )
+    );
+
+    if(maxDelayRatio>=2.0)score+=30;
+    else if(maxDelayRatio>=1.5)score+=20;
+    else if(maxDelayRatio>=1.2)score+=10;
 
     if(flagged>=3)score+=50;
     else if(flagged===2)score+=30;
     else if(flagged===1)score+=15;
+
+    // 「最後にこの子を遊んで、その後来店停止」を強く拾う
+    if(stoppedCount>=2)score+=25;
+    else if(stoppedCount===1)score+=15;
 
     if(redCount>=2)score+=20;
     else if(redCount===1)score+=10;
@@ -893,12 +961,24 @@ else if(maxDelayRatio>=1.2)score+=10;
     score=Math.max(0,Math.min(100,score));
 
     const reasons=[];
-　　if(maxDelayRatio>=2.0)reasons.push(`周期乱れ 最大${maxDelayRatio.toFixed(1)}倍`);
-else if(maxDelayRatio>=1.5)reasons.push(`周期乱れ 最大${maxDelayRatio.toFixed(1)}倍`);
-else if(maxDelayRatio>=1.2)reasons.push(`周期乱れ 最大${maxDelayRatio.toFixed(1)}倍`);
-    if(flagged>=3)reasons.push(`要確認客が${flagged}人`);
-else if(flagged===2)reasons.push("要確認客が2人");
-else if(flagged===1)reasons.push("要確認客が1人");
+
+    if(maxDelayRatio>=2.0)
+      reasons.push(`周期乱れ 最大${maxDelayRatio.toFixed(1)}倍`);
+    else if(maxDelayRatio>=1.5)
+      reasons.push(`周期乱れ 最大${maxDelayRatio.toFixed(1)}倍`);
+    else if(maxDelayRatio>=1.2)
+      reasons.push(`周期乱れ 最大${maxDelayRatio.toFixed(1)}倍`);
+
+    if(flagged>=3)
+      reasons.push(`要確認客が${flagged}人`);
+    else if(flagged===2)
+      reasons.push("要確認客が2人");
+    else if(flagged===1)
+      reasons.push("要確認客が1人");
+
+    if(stoppedCount){
+      reasons.push(`最終利用後の来店停止${stoppedCount}人`);
+    }
 
     if(flaggedRate>=0.5){
       reasons.push(`要確認率${Math.round(flaggedRate*100)}%`);
