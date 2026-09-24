@@ -749,7 +749,7 @@ vs.forEach(v=>{
 
 const rank=Object.entries(gr)
   .sort((a,b)=>b[1]-a[1])
-  .slice(0,10);
+  ;
 
 $("girlRank").innerHTML=rank.length
   ?rank.map(([g,n],i)=>`<div class="customer"><div class="custTop"><div class="custName" style="cursor:pointer;text-decoration:underline;text-underline-offset:3px" onclick="openGirlCourse('${encodeURIComponent(g)}')">${i+1}. ${esc(g)}</div><div><b>${n}本</b></div></div></div>`).join("")
