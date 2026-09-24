@@ -545,10 +545,11 @@ window.openGirlCourse=function(enc){
   );
 
   $("girlCourseTitle").textContent=`${girl}｜${monthNum}月コース内訳`;
-
+　const coursePrice={60:10000,70:11000,80:12000,90:13000,100:14000,110:15000,120:16000,150:19000,180:22000};
+  const totalEarning=list.reduce((sum,[course,n])=>sum+((coursePrice[parseInt(course)]||0)*n),0);
   $("girlCourseBody").innerHTML=list.length
-    ?list.map(([course,n])=>`<div class="customer"><div class="custTop"><div class="custName">${esc(course)}</div><div><b>${n}本</b></div></div></div>`).join("")
-      +`<div class="notice" style="margin-top:12px"><b>合計 ${rows.length}本</b></div>`
+    ?list.map(([course,n])=>`<div class="customer"><div class="custTop"><div class="custName">${esc(course)}</div><div><b>${n}本</b><span style="margin-left:24px">${((coursePrice[parseInt(course)]||0)*n).toLocaleString("ja-JP")}円</span></div></div></div>`).join("")
+      +`<div class="notice" style="margin-top:12px"><b>合計 ${rows.length}本　｜　総稼ぎ ${totalEarning.toLocaleString("ja-JP")}円</b></div>`
     :'<div class="empty">この月のデータなし</div>';
 
   $("girlCourseModal").classList.add("show");
