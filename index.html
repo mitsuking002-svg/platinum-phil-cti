@@ -754,7 +754,7 @@ const rank=Object.entries(gr)
   ;
 
 $("girlRank").innerHTML=rank.length
-  ?rank.map(([g,n],i)=>`<div class="customer"><div class="custTop"><div class="custName" style="cursor:pointer;text-decoration:underline;text-underline-offset:3px" onclick="openGirlCourse('${encodeURIComponent(g)}')">${i+1}. ${esc(g)}</div><div><b>${Math.round((grMoney[g]||0)*0.9).toLocaleString("ja-JP")}円　${n}本　${(grMoney[g]||0).toLocaleString("ja-JP")}円
+  ?rank.map(([g,n],i)=>`<div class="customer"><div class="custTop"><div class="custName" style="cursor:pointer;text-decoration:underline;text-underline-offset:3px" onclick="openGirlCourse('${encodeURIComponent(g)}')">${i+1}. ${esc(g)}</div><div><b>${Math.round((grMoney[g]||0)*0.9).toLocaleString("ja-JP")}円　${n}本　${(grMoney[g]||0).toLocaleString("ja-JP")}円</b></div></div></div>`).join("")
   :'<div class="empty">この月のデータなし</div>';
 
 $("periodUsageTitle").textContent=monthLabel+"の利用";
