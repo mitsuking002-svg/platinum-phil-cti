@@ -743,7 +743,9 @@ $("kpis").innerHTML=[
 ].map(x=>`<div class="kpi"><div class="n">${x[0]}</div><div class="v">${x[1]}</div><div class="s">${x[2]}</div></div>`).join("");
 
 const gr={};
+const grMoney={};  
 vs.forEach(v=>{
+  if(v.girl)grMoney[v.girl]=(grMoney[v.girl]||0)+({60:10000,70:11000,80:12000,90:13000,100:14000,110:15000,120:16000,150:19000,180:22000}[Number(v.course)]||0);
   if(v.girl)gr[v.girl]=(gr[v.girl]||0)+1
 });
 
@@ -752,7 +754,7 @@ const rank=Object.entries(gr)
   ;
 
 $("girlRank").innerHTML=rank.length
-  ?rank.map(([g,n],i)=>`<div class="customer"><div class="custTop"><div class="custName" style="cursor:pointer;text-decoration:underline;text-underline-offset:3px" onclick="openGirlCourse('${encodeURIComponent(g)}')">${i+1}. ${esc(g)}</div><div><b>${n}本</b></div></div></div>`).join("")
+  ?rank.map(([g,n],i)=>`<div class="customer"><div class="custTop"><div class="custName" style="cursor:pointer;text-decoration:underline;text-underline-offset:3px" onclick="openGirlCourse('${encodeURIComponent(g)}')">${i+1}. ${esc(g)}</div><div><b>${n}本　${(grMoney[g]||0).toLocaleString("ja-JP")}円
   :'<div class="empty">この月のデータなし</div>';
 
 $("periodUsageTitle").textContent=monthLabel+"の利用";
