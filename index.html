@@ -36,6 +36,17 @@ body{
 }
 button,input,select,textarea{font:inherit}
 .wrap{max-width:1120px;margin:auto;padding:calc(14px + env(safe-area-inset-top)) 13px calc(92px + env(safe-area-inset-bottom))}
+  html, body, #appRoot {
+  overflow-x: clip;
+  max-width: 100%;
+  touch-action: pan-y;
+}
+
+.wrap {
+  width: 100%;
+  max-width: 1120px;
+  overflow-x: clip;
+}
 header{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:2px 2px 14px}
 .brand{font-size:20px;font-weight:950;letter-spacing:.03em}.sub{font-size:10px;color:var(--muted);margin-top:4px}
 .liveBadge{padding:7px 10px;border:1px solid #365e4e;background:#10251d;color:#79d9ad;border-radius:999px;font-size:10px;font-weight:850}
