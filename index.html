@@ -862,6 +862,25 @@ $("customerRiskRank").innerHTML=riskRows.length
     </div>`;
   }).join("")
   :'<div class="empty">分析できるリピーター履歴がありません</div>';
+// 最終来店後の再問い合わせは来店停止の推測を弱める材料とする。
+function hasFollowupInquiryAfterLastVisit(r){
+  const c=r.customer;
+  const lastVisit=customerVisits(c.id)[0];
+  if(!lastVisit?.date)return false;
+  const phone=normPhone(c.phone);
+  return (window.ctiRiskInquiries||[]).some(q=>{
+    if(q.result==="reserved" || !q.inquiry_date)return false;
+    if(!(
+      (q.customer_id && q.customer_id===c.id) ||
+      (phone && normPhone(q.phone)===phone)
+    ))return false;
+    if(q.inquiry_date>lastVisit.date)return true;
+    // 同日は問い合わせが実利用より後にあったと確認できる場合だけ対象。
+    return q.inquiry_date===lastVisit.date &&
+      !!q.inquiry_time && !!lastVisit.time &&
+      String(q.inquiry_time).slice(0,5)>String(lastVisit.time).slice(0,5);
+  });
+}
 const girlRiskMap={};
 
 allRiskRows.forEach(r=>{
@@ -970,6 +989,11 @@ const girlRiskRows=Object.entries(girlRiskMap)
     const movedCount=
       rows.filter(r=>r.movedElsewhere).length;
 
+    // 同じお客様の問い合わせは何回あっても1人分だけ減点する。
+    const inquiryReliefCount=flaggedRows.filter(r=>
+      r.lastGirl===girl && hasFollowupInquiryAfterLastVisit(r)
+    ).length;
+
     const flaggedRate=
       fixed?flagged/fixed:0;
 
@@ -1023,7 +1047,9 @@ const girlRiskRows=Object.entries(girlRiskMap)
 
     score-=Math.min(20,movedCount*10);
 
+    // 100%上限に丸めた後、再問い合わせ1人につき20ポイント減点。
     score=Math.max(0,Math.min(100,score));
+    score=Math.max(0,score-inquiryReliefCount*20);
 
     const reasons=[];
 
@@ -1060,10 +1086,14 @@ const girlRiskRows=Object.entries(girlRiskMap)
     if(movedCount){
       reasons.push(`店内で別女性へ移動${movedCount}人`);
     }
+    if(inquiryReliefCount){
+      reasons.push(`再問い合わせ${inquiryReliefCount}人・${inquiryReliefCount*20}pt減点`);
+    }
 
     return{
       girl,
       score,
+      inquiryReliefCount,
       flagged,
       total:fixed,
       topCustomers:flaggedRows,
@@ -1075,7 +1105,10 @@ const girlRiskRows=Object.entries(girlRiskMap)
 
 $("girlRiskRank").innerHTML=girlRiskRows.length
   ?girlRiskRows.filter(g=>g.score>=40).slice(0,20).map((g,i)=>{
-    const status=g.score>=70?"🔴 要確認":g.score>=40?"🟡 変化あり":"🟢 通常";
+    // 再問い合わせ減点後は80%でも黄表示（他の通常判定は変更しない）。
+    const status=g.inquiryReliefCount>0 && g.score>=40
+      ?"🟡 再接触あり"
+      :g.score>=70?"🔴 要確認":g.score>=40?"🟡 変化あり":"🟢 通常";
 
     return `<div class="customer">
       <div class="custTop">
@@ -1674,6 +1707,7 @@ iq('iqStats').innerHTML = [
     iq('iqMemo').value = '';
     initInquiryForm();
     await loadInquiries();
+    window.dispatchEvent(new Event('focus'));
   });
 
   radio.addEventListener('change', () => { if (radio.checked) loadInquiries(); });
@@ -1780,7 +1814,9 @@ iq('iqStats').innerHTML = [
     }
 
     historyInquiries = r.data || [];
+    window.ctiRiskInquiries = historyInquiries;
 
+    if(document.getElementById('tab-dashboard')?.checked)renderDashboard();
     if(document.getElementById('quickSearch')?.value.trim()){
       renderQuick();
     }
